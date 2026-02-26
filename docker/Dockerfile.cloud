@@ -40,6 +40,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # FastAPI will serve these as static files (see FRONTEND_BUILD_DIR below).
 COPY --from=frontend-build /build/build/client /app/static
 
+# Pre-create the default config directory so the SQLite conversation store
+# can open its database file even when VALUECELL_DATABASE_URL points to
+# a non-SQLite backend (PostgreSQL) and the system fallback path is used.
+RUN mkdir -p /root/.config/valuecell
+
 # ─── Runtime configuration ─────────────────────────────────────────────────────
 ENV APP_ENVIRONMENT=production
 ENV API_DEBUG=false

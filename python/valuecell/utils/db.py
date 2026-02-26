@@ -25,14 +25,20 @@ def resolve_db_path() -> str:
     2) Default to system application directory (e.g., `~/Library/Application Support/ValueCell/valuecell.db` on macOS)
 
     Note: This function returns a filesystem path, not a SQLAlchemy DSN.
+    The parent directory is created automatically if it does not exist.
     """
     # Prefer generic VALUECELL_DATABASE_URL if it points to SQLite
     db_url = os.environ.get("VALUECELL_DATABASE_URL")
     if db_url and db_url.startswith("sqlite:///"):
-        return _strip_sqlite_prefix(db_url)
+        path = _strip_sqlite_prefix(db_url)
+    else:
+        # Default: store under system application directory alongside `.env`
+        path = os.path.join(get_system_env_dir(), "valuecell.db")
 
-    # Default: store under system application directory alongside `.env`
-    return os.path.join(get_system_env_dir(), "valuecell.db")
+    # Ensure the parent directory exists (important for containerised deployments
+    # where the home-based config dir may not be pre-created).
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    return path
 
 
 def resolve_lancedb_uri() -> str:
