@@ -140,7 +140,7 @@ export const useGetStrategyPrompts = () => {
   return useQuery({
     queryKey: API_QUERY_KEYS.STRATEGY.strategyPrompts,
     queryFn: () =>
-      apiClient.get<ApiResponse<StrategyPrompt[]>>("/strategies/prompts"),
+      apiClient.get<ApiResponse<StrategyPrompt[]>>("/strategies/prompts/"),
     select: (data) => data.data,
     staleTime: 0,
   });
