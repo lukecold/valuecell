@@ -78,14 +78,25 @@ jobs:
 
       - name: Pull new image and restart
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          VALUECELL_DATABASE_URL: ${{ secrets.VALUECELL_DATABASE_URL }}
         with:
           host: ${{ secrets.VM_IP }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          envs: VALUECELL_DATABASE_URL
           script: |
             set -euo pipefail
             cd ${{ env.DEPLOY_DIR }}
             mkdir -p data
+
+            # Write DATABASE_URL to .env (upsert: remove old line then append new one)
+            if [ -n "${VALUECELL_DATABASE_URL:-}" ]; then
+              touch .env
+              grep -v "^VALUECELL_DATABASE_URL=" .env > .env.tmp || true
+              echo "VALUECELL_DATABASE_URL=${VALUECELL_DATABASE_URL}" >> .env.tmp
+              mv .env.tmp .env
+            fi
 
             # Log in to GHCR so Docker can pull the image
             echo "${{ secrets.GITHUB_TOKEN }}" | \
