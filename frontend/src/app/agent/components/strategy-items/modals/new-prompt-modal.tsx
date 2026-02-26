@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import CloseButton from "@/components/valuecell/button/close-button";
 
 interface NewPromptModalProps {
-  onSave: (value: { name: string; content: string }) => void;
+  onSave: (value: { name: string; content: string }) => Promise<void> | void;
   children: React.ReactNode;
 }
 
@@ -45,10 +45,13 @@ const NewPromptModal: FC<NewPromptModalProps> = ({ onSave, children }) => {
     },
     onSubmit: async ({ value }) => {
       setIsSaving(true);
-      await onSave(value);
-      setIsSaving(false);
-      form.reset();
-      setOpen(false);
+      try {
+        await onSave(value);
+        form.reset();
+        setOpen(false);
+      } finally {
+        setIsSaving(false);
+      }
     },
   });
 

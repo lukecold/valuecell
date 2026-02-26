@@ -233,24 +233,25 @@ export const TradingStrategyForm = withForm({
                                   )}
                                 </SelectItem>
                               ))}
-                            <NewPromptModal
-                              onSave={async (value) => {
-                                const { data: prompt } =
-                                  await createStrategyPrompt(value);
-                                form.setFieldValue("template_id", prompt.id);
-                              }}
-                            >
-                              <Button
-                                className="w-full"
-                                type="button"
-                                variant="outline"
-                              >
-                                <Plus />
-                                {t("strategy.form.promptTemplate.new")}
-                              </Button>
-                            </NewPromptModal>
                           </SelectContent>
                         </Select>
+
+                        <NewPromptModal
+                          onSave={async (value) => {
+                            const { data: prompt } =
+                              await createStrategyPrompt(value);
+                            form.setFieldValue("template_id", prompt.id);
+                          }}
+                        >
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            title={t("strategy.form.promptTemplate.new")}
+                          >
+                            <Plus />
+                          </Button>
+                        </NewPromptModal>
 
                         <ViewStrategyModal
                           prompt={prompts.find(
