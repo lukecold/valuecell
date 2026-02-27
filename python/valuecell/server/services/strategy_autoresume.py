@@ -150,7 +150,17 @@ async def _resume_one(orchestrator: AgentOrchestrator, strategy_row: Strategy) -
 
 
 def _should_resume(strategy_row: Strategy) -> bool:
-    """Return True if strategy should be auto-resumed based on status/metadata."""
+    """Return True if strategy should be auto-resumed based on status/metadata.
+
+    Resume semantics:
+    - RUNNING: container was killed mid-run (crash / host restart) — always resume.
+    - STOPPED + no stop_reason: unclean stop (container kill, VM reset, OOM) —
+      resume because no user intent was recorded.
+    - STOPPED + stop_reason == 'cancelled': gracefully cancelled but intended to
+      auto-resume — resume.
+    - STOPPED + any other stop_reason (user_stopped, normal_exit, error, …):
+      do NOT resume; the stop was intentional or requires manual review.
+    """
     status_raw = strategy_row.status or ""
     metadata = strategy_row.strategy_metadata or {}
     try:
@@ -162,10 +172,13 @@ def _should_resume(strategy_row: Strategy) -> bool:
     if status_enum == StrategyStatus.RUNNING:
         return True
 
-    if (
-        status_enum == StrategyStatus.STOPPED
-        and metadata.get("stop_reason") == StopReason.CANCELLED.value
-    ):
-        return True
+    if status_enum == StrategyStatus.STOPPED:
+        stop_reason = metadata.get("stop_reason") or ""
+        # No recorded stop_reason → unclean / abrupt stop; safe to resume.
+        if not stop_reason:
+            return True
+        # Graceful cancellation that is meant to auto-resume.
+        if stop_reason == StopReason.CANCELLED.value:
+            return True
 
     return False

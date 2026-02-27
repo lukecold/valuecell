@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from valuecell.agents.common.trading.models import (
     ExchangeConfig,
+    StopReason,
     StrategyStatus,
     StrategyStatusContent,
     StrategyType,
@@ -328,11 +329,20 @@ def create_strategy_agent_router() -> APIRouter:
             if not strategy:
                 raise HTTPException(status_code=404, detail="Strategy not found")
 
-            # Stop strategy before deletion (best-effort, idempotent)
+            # Stop strategy before deletion (best-effort, idempotent).
+            # Write user_stopped reason so auto-resume ignores this strategy
+            # if the delete partially fails and the row persists.
             try:
                 current_status = getattr(strategy, "status", None)
                 if current_status != "stopped":
-                    repo.upsert_strategy(strategy_id=id, status="stopped")
+                    existing_meta = getattr(strategy, "strategy_metadata", None) or {}
+                    updated_meta = {
+                        **existing_meta,
+                        "stop_reason": StopReason.USER_STOPPED.value,
+                    }
+                    repo.upsert_strategy(
+                        strategy_id=id, status="stopped", metadata=updated_meta
+                    )
             except Exception:
                 # Do not fail deletion due to stop failure; proceed to deletion
                 pass

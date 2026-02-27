@@ -431,6 +431,7 @@ class StopReason(str, Enum):
     CANCELLED = "cancelled"
     ERROR = "error"
     ERROR_CLOSING_POSITIONS = "error_closing_positions"
+    USER_STOPPED = "user_stopped"
 
 
 class Constraints(BaseModel):
