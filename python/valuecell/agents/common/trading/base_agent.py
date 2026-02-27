@@ -248,8 +248,20 @@ class BaseStrategyAgent(BaseAgent, ABC):
         except Exception:
             logger.exception("Error in _on_start hook for strategy {}", strategy_id)
 
+        # How many consecutive cycle failures to tolerate before stopping.
+        # A transient network error or a temporary LLM outage should not
+        # permanently kill the strategy; only persistent failures do.
+        _MAX_CONSECUTIVE_ERRORS = 3
+        # Hard timeout per cycle (features + LLM + execution). A hanging
+        # network call would keep the strategy in "running" state forever
+        # without this guard.
+        _CYCLE_TIMEOUT_S = 300  # 5 minutes
+        # Back-off delay between retries (doubles each time, capped at 5 min).
+        _RETRY_BASE_DELAY_S = 30
+
         stop_reason = StopReason.NORMAL_EXIT
         stop_reason_detail: Optional[str] = None
+        consecutive_errors: int = 0
         try:
             logger.info("Starting decision loop for strategy_id={}", strategy_id)
             # Always attempt to persist an initial state (idempotent write).
@@ -257,7 +269,50 @@ class BaseStrategyAgent(BaseAgent, ABC):
 
             # Main decision loop
             while controller.is_running():
-                result = await runtime.run_cycle()
+                try:
+                    result = await asyncio.wait_for(
+                        runtime.run_cycle(), timeout=_CYCLE_TIMEOUT_S
+                    )
+                except asyncio.TimeoutError as timeout_err:
+                    consecutive_errors += 1
+                    logger.warning(
+                        "Cycle timed out (>{} s) for strategy={} "
+                        "(consecutive errors: {}/{})",
+                        _CYCLE_TIMEOUT_S,
+                        strategy_id,
+                        consecutive_errors,
+                        _MAX_CONSECUTIVE_ERRORS,
+                    )
+                    if consecutive_errors >= _MAX_CONSECUTIVE_ERRORS:
+                        raise RuntimeError(
+                            f"Cycle timed out {consecutive_errors} times in a row"
+                        ) from timeout_err
+                    delay = min(_RETRY_BASE_DELAY_S * consecutive_errors, _CYCLE_TIMEOUT_S)
+                    await asyncio.sleep(delay)
+                    continue
+                except asyncio.CancelledError:
+                    raise
+                except Exception as cycle_err:
+                    consecutive_errors += 1
+                    logger.warning(
+                        "Cycle error for strategy={} "
+                        "(consecutive errors: {}/{}): {}",
+                        strategy_id,
+                        consecutive_errors,
+                        _MAX_CONSECUTIVE_ERRORS,
+                        cycle_err,
+                    )
+                    if consecutive_errors >= _MAX_CONSECUTIVE_ERRORS:
+                        raise
+                    delay = min(_RETRY_BASE_DELAY_S * consecutive_errors, _CYCLE_TIMEOUT_S)
+                    logger.info(
+                        "Retrying cycle for strategy={} in {} s", strategy_id, delay
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+
+                # Successful cycle — reset error counter
+                consecutive_errors = 0
                 logger.info(
                     "Run cycle completed for strategy={} trades_count={}",
                     strategy_id,

@@ -2,6 +2,7 @@
 StrategyAgent router for handling strategy creation via streaming responses.
 """
 
+import asyncio
 import os
 
 # New imports for delete endpoint
@@ -37,9 +38,13 @@ def create_strategy_agent_router() -> APIRouter:
 
     @router.on_event("startup")
     async def _startup_auto_resume() -> None:
-        """Schedule strategy auto-resume on FastAPI startup."""
+        """Schedule strategy auto-resume on FastAPI startup.
+
+        Runs as a background task so the server starts accepting requests
+        immediately — auto-resume should not block the HTTP listener.
+        """
         try:
-            await auto_resume_strategies(orchestrator)
+            asyncio.create_task(auto_resume_strategies(orchestrator))
         except Exception:
             logger.warning("Failed to schedule strategy auto-resume startup task")
 

@@ -22,6 +22,7 @@ impacting other candidates.
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Optional
 
 from loguru import logger
@@ -32,6 +33,7 @@ from valuecell.agents.common.trading.models import (
     StrategyStatusContent,
     UserRequest,
 )
+from valuecell.config.loader import get_config_loader
 from valuecell.core.coordinate.orchestrator import AgentOrchestrator
 from valuecell.core.types import CommonResponseEvent, UserInput, UserInputMetadata
 from valuecell.server.db.models.strategy import Strategy
@@ -68,14 +70,11 @@ async def auto_resume_strategies(
             logger.info("Auto-resume: no eligible strategies found")
             return
         logger.info("Auto-resume: found {} eligible strategies", len(candidates))
-        # Create tasks for each resume and keep them running. We await the
-        # gathered tasks so that when this coroutine is run with
-        # `asyncio.run(...)` (background thread) the loop stays alive until
-        # the resumed strategies finish. When scheduled on an already-running
-        # loop, this will run as background tasks concurrently as well.
-        tasks = [asyncio.create_task(_resume_one(orchestrator, s)) for s in candidates]
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        # Fire-and-forget: create background tasks and do NOT await them.
+        # The caller (FastAPI startup event) must not be blocked waiting for
+        # strategies to fully restart — each strategy runs independently.
+        for s in candidates:
+            asyncio.create_task(_resume_one(orchestrator, s))
     except asyncio.CancelledError:
         raise
     except Exception:
@@ -93,6 +92,29 @@ async def _resume_one(orchestrator: AgentOrchestrator, strategy_row: Strategy) -
         request = UserRequest.model_validate(config_dict)
         if request.trading_config.strategy_id is None and strategy_id:
             request.trading_config.strategy_id = strategy_id
+
+        # Re-apply LLM API key to os.environ so the in-process LlmComposer can
+        # find it — mirrors the override the HTTP router performs at creation time.
+        # The key was stored in llm_model_config (not excluded by _safe_config_dump).
+        try:
+            provider = request.llm_model_config.provider
+            api_key = request.llm_model_config.api_key
+            if provider and api_key:
+                loader = get_config_loader()
+                provider_cfg_raw = loader.load_provider_config(provider) or {}
+                api_key_env = provider_cfg_raw.get("connection", {}).get("api_key_env")
+                if api_key_env:
+                    os.environ[api_key_env] = api_key
+                    loader.clear_cache()
+                    logger.info(
+                        "Auto-resume: restored {} env var for strategy_id={}",
+                        api_key_env,
+                        strategy_id,
+                    )
+        except Exception:
+            logger.warning(
+                "Auto-resume: could not restore LLM API key for strategy_id={}", strategy_id
+            )
 
         user_input = UserInput(
             query=request.model_dump_json(),
