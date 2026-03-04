@@ -31,6 +31,7 @@ from valuecell.agents.common.trading.models import (
     StopReason,
     StrategyStatus,
     StrategyStatusContent,
+    TradingMode,
     UserRequest,
 )
 from valuecell.config.loader import get_config_loader
@@ -116,6 +117,65 @@ async def _resume_one(orchestrator: AgentOrchestrator, strategy_row: Strategy) -
                 "Auto-resume: could not restore LLM API key for strategy_id={}",
                 strategy_id,
             )
+
+        # Re-inject exchange credentials for live trading strategies.
+        # Credentials are excluded from stored config (_safe_config_dump) for security.
+        # Restore them from environment variables using the convention:
+        #   {EXCHANGE_ID_UPPER}_API_KEY, {EXCHANGE_ID_UPPER}_SECRET_KEY, etc.
+        # Set these in /opt/valuecell/.env on the VM (same pattern as AI provider keys).
+        try:
+            if request.exchange_config.trading_mode == TradingMode.LIVE:
+                exchange_id = (
+                    request.exchange_config.exchange_id or ""
+                ).upper().replace("-", "_")
+                _cred_fields = [
+                    ("api_key", f"{exchange_id}_API_KEY"),
+                    ("secret_key", f"{exchange_id}_SECRET_KEY"),
+                    ("passphrase", f"{exchange_id}_PASSPHRASE"),
+                    ("wallet_address", f"{exchange_id}_WALLET_ADDRESS"),
+                    ("private_key", f"{exchange_id}_PRIVATE_KEY"),
+                ]
+                injected = {}
+                for field, env_var in _cred_fields:
+                    if not getattr(request.exchange_config, field, None):
+                        env_val = os.environ.get(env_var)
+                        if env_val:
+                            injected[field] = env_val
+                if injected:
+                    request = request.model_copy(
+                        update={
+                            "exchange_config": request.exchange_config.model_copy(
+                                update=injected
+                            )
+                        }
+                    )
+                    logger.info(
+                        "Auto-resume: injected exchange credentials {} for strategy_id={}",
+                        list(injected.keys()),
+                        strategy_id,
+                    )
+
+                # Safety check: abort if live strategy still has no credentials.
+                missing = not (
+                    request.exchange_config.api_key
+                    or request.exchange_config.private_key
+                )
+                if missing:
+                    logger.warning(
+                        "Auto-resume: skipping live strategy {} — exchange credentials "
+                        "not available. Set {}_API_KEY / {}_SECRET_KEY in the VM .env "
+                        "file to enable auto-resume for live strategies.",
+                        strategy_id,
+                        exchange_id,
+                        exchange_id,
+                    )
+                    return
+        except Exception:
+            logger.warning(
+                "Auto-resume: could not restore exchange credentials for strategy_id={}",
+                strategy_id,
+            )
+            return
 
         user_input = UserInput(
             query=request.model_dump_json(),

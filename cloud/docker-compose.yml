@@ -31,6 +31,20 @@ services:
       AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      # ── Exchange credentials (for live trading auto-resume) ────────────────────
+      # Live strategies lose credentials on restart (not stored in DB for security).
+      # Set exchange keys here so they can be re-injected when strategies auto-resume.
+      # Convention: {EXCHANGE_ID_UPPER}_API_KEY / _SECRET_KEY / _PASSPHRASE
+      #   echo "BINANCE_API_KEY=..." >> /opt/valuecell/.env
+      #   echo "BINANCE_SECRET_KEY=..." >> /opt/valuecell/.env
+      BINANCE_API_KEY: ${BINANCE_API_KEY:-}
+      BINANCE_SECRET_KEY: ${BINANCE_SECRET_KEY:-}
+      OKX_API_KEY: ${OKX_API_KEY:-}
+      OKX_SECRET_KEY: ${OKX_SECRET_KEY:-}
+      OKX_PASSPHRASE: ${OKX_PASSPHRASE:-}
+      BYBIT_API_KEY: ${BYBIT_API_KEY:-}
+      BYBIT_SECRET_KEY: ${BYBIT_SECRET_KEY:-}
     volumes:
       # Persistent data directory – SQLite DB lives here.
       - /opt/valuecell/data:/data
