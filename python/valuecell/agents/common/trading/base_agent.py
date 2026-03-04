@@ -287,7 +287,9 @@ class BaseStrategyAgent(BaseAgent, ABC):
                         raise RuntimeError(
                             f"Cycle timed out {consecutive_errors} times in a row"
                         ) from timeout_err
-                    delay = min(_RETRY_BASE_DELAY_S * consecutive_errors, _CYCLE_TIMEOUT_S)
+                    delay = min(
+                        _RETRY_BASE_DELAY_S * consecutive_errors, _CYCLE_TIMEOUT_S
+                    )
                     await asyncio.sleep(delay)
                     continue
                 except asyncio.CancelledError:
@@ -295,8 +297,7 @@ class BaseStrategyAgent(BaseAgent, ABC):
                 except Exception as cycle_err:
                     consecutive_errors += 1
                     logger.warning(
-                        "Cycle error for strategy={} "
-                        "(consecutive errors: {}/{}): {}",
+                        "Cycle error for strategy={} (consecutive errors: {}/{}): {}",
                         strategy_id,
                         consecutive_errors,
                         _MAX_CONSECUTIVE_ERRORS,
@@ -304,7 +305,9 @@ class BaseStrategyAgent(BaseAgent, ABC):
                     )
                     if consecutive_errors >= _MAX_CONSECUTIVE_ERRORS:
                         raise
-                    delay = min(_RETRY_BASE_DELAY_S * consecutive_errors, _CYCLE_TIMEOUT_S)
+                    delay = min(
+                        _RETRY_BASE_DELAY_S * consecutive_errors, _CYCLE_TIMEOUT_S
+                    )
                     logger.info(
                         "Retrying cycle for strategy={} in {} s", strategy_id, delay
                     )

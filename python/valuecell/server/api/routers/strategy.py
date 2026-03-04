@@ -505,8 +505,13 @@ def create_strategy_router() -> APIRouter:
             # auto-resume will NOT restart this strategy on the next boot.
             # Merge into existing metadata to preserve agent_name, trading_mode, etc.
             existing_meta = strategy.strategy_metadata or {}
-            updated_meta = {**existing_meta, "stop_reason": StopReason.USER_STOPPED.value}
-            repo.upsert_strategy(strategy_id=id, status="stopped", metadata=updated_meta)
+            updated_meta = {
+                **existing_meta,
+                "stop_reason": StopReason.USER_STOPPED.value,
+            }
+            repo.upsert_strategy(
+                strategy_id=id, status="stopped", metadata=updated_meta
+            )
 
             response_data = StrategyStatusUpdateResponse(
                 strategy_id=id,

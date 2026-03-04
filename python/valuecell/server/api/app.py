@@ -197,7 +197,9 @@ def _add_routes(app: FastAPI, settings) -> None:
     _frontend_dir_str = os.getenv("FRONTEND_BUILD_DIR", "")
     _frontend_path: Path | None = Path(_frontend_dir_str) if _frontend_dir_str else None
     _serve_frontend = bool(
-        _frontend_path and _frontend_path.is_dir() and (_frontend_path / "index.html").exists()
+        _frontend_path
+        and _frontend_path.is_dir()
+        and (_frontend_path / "index.html").exists()
     )
 
     if _serve_frontend:

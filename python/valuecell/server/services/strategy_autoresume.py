@@ -113,7 +113,8 @@ async def _resume_one(orchestrator: AgentOrchestrator, strategy_row: Strategy) -
                     )
         except Exception:
             logger.warning(
-                "Auto-resume: could not restore LLM API key for strategy_id={}", strategy_id
+                "Auto-resume: could not restore LLM API key for strategy_id={}",
+                strategy_id,
             )
 
         user_input = UserInput(
