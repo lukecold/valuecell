@@ -86,6 +86,7 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           envs: VALUECELL_DATABASE_URL,GCP_SECRET_NAME
+          command_timeout: 30m
           script: |
             set -euo pipefail
             cd ${{ env.DEPLOY_DIR }}
