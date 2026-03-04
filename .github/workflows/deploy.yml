@@ -80,23 +80,29 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           VALUECELL_DATABASE_URL: ${{ secrets.VALUECELL_DATABASE_URL }}
+          GCP_SECRET_NAME: ${{ vars.GCP_SECRET_NAME || 'BinanceSecrets' }}
         with:
           host: ${{ secrets.VM_IP }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          envs: VALUECELL_DATABASE_URL
+          envs: VALUECELL_DATABASE_URL,GCP_SECRET_NAME
           script: |
             set -euo pipefail
             cd ${{ env.DEPLOY_DIR }}
             mkdir -p data
 
-            # Write DATABASE_URL to .env (upsert: remove old line then append new one)
-            if [ -n "${VALUECELL_DATABASE_URL:-}" ]; then
+            # Upsert env vars into .env (remove old line then append new one)
+            upsert_env() {
+              local key="$1" value="$2"
+              [ -n "$value" ] || return 0
               touch .env
-              grep -v "^VALUECELL_DATABASE_URL=" .env > .env.tmp || true
-              echo "VALUECELL_DATABASE_URL=${VALUECELL_DATABASE_URL}" >> .env.tmp
+              grep -v "^${key}=" .env > .env.tmp || true
+              echo "${key}=${value}" >> .env.tmp
               mv .env.tmp .env
-            fi
+            }
+
+            upsert_env VALUECELL_DATABASE_URL "${VALUECELL_DATABASE_URL:-}"
+            upsert_env GCP_SECRET_NAME "${GCP_SECRET_NAME:-}"
 
             # Log in to GHCR so Docker can pull the image
             echo "${{ secrets.GITHUB_TOKEN }}" | \

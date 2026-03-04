@@ -38,7 +38,6 @@ services:
       #   echo "GCP_PROJECT_ID=<your-project-id>" >> /opt/valuecell/.env
       # The VM service account needs the "Secret Manager Secret Accessor" IAM role.
       GCP_SECRET_NAME: ${GCP_SECRET_NAME:-}
-      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
       # ── Exchange credentials (for live trading auto-resume) ────────────────────
       # Alternative to GCP secrets: set keys directly in /opt/valuecell/.env.
       # Convention: {EXCHANGE_ID_UPPER}_API_KEY / _SECRET_KEY / _PASSPHRASE
