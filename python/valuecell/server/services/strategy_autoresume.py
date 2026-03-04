@@ -126,18 +126,23 @@ async def _resume_one(orchestrator: AgentOrchestrator, strategy_row: Strategy) -
         try:
             if request.exchange_config.trading_mode == TradingMode.LIVE:
                 exchange_id = (
-                    request.exchange_config.exchange_id or ""
-                ).upper().replace("-", "_")
+                    (request.exchange_config.exchange_id or "")
+                    .upper()
+                    .replace("-", "_")
+                )
                 _cred_fields = [
                     ("api_key", f"{exchange_id}_API_KEY"),
                     ("secret_key", f"{exchange_id}_SECRET_KEY"),
+                    ("secret_key", f"{exchange_id}_API_SECRET"),  # common alias
                     ("passphrase", f"{exchange_id}_PASSPHRASE"),
                     ("wallet_address", f"{exchange_id}_WALLET_ADDRESS"),
                     ("private_key", f"{exchange_id}_PRIVATE_KEY"),
                 ]
                 injected = {}
                 for field, env_var in _cred_fields:
-                    if not getattr(request.exchange_config, field, None):
+                    if field not in injected and not getattr(
+                        request.exchange_config, field, None
+                    ):
                         env_val = os.environ.get(env_var)
                         if env_val:
                             injected[field] = env_val

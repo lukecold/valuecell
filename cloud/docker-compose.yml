@@ -32,12 +32,16 @@ services:
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      # ── GCP Secret Manager (recommended: loads exchange keys at startup) ────────
+      # Store credentials as a GCP secret (KEY=VALUE lines), then set these two:
+      #   echo "GCP_SECRET_NAME=BinanceSecrets" >> /opt/valuecell/.env
+      #   echo "GCP_PROJECT_ID=<your-project-id>" >> /opt/valuecell/.env
+      # The VM service account needs the "Secret Manager Secret Accessor" IAM role.
+      GCP_SECRET_NAME: ${GCP_SECRET_NAME:-}
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
       # ── Exchange credentials (for live trading auto-resume) ────────────────────
-      # Live strategies lose credentials on restart (not stored in DB for security).
-      # Set exchange keys here so they can be re-injected when strategies auto-resume.
+      # Alternative to GCP secrets: set keys directly in /opt/valuecell/.env.
       # Convention: {EXCHANGE_ID_UPPER}_API_KEY / _SECRET_KEY / _PASSPHRASE
-      #   echo "BINANCE_API_KEY=..." >> /opt/valuecell/.env
-      #   echo "BINANCE_SECRET_KEY=..." >> /opt/valuecell/.env
       BINANCE_API_KEY: ${BINANCE_API_KEY:-}
       BINANCE_SECRET_KEY: ${BINANCE_SECRET_KEY:-}
       OKX_API_KEY: ${OKX_API_KEY:-}

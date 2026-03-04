@@ -27,6 +27,7 @@ from valuecell.server.api.schemas.base import ErrorResponse, StatusCode, Success
 # Note: Strategy type is now part of TradingConfig in the request body.
 from valuecell.server.db.connection import get_db
 from valuecell.server.db.repositories import get_strategy_repository
+from valuecell.server.services.gcp_secrets import load_gcp_secret_to_env
 from valuecell.server.services.strategy_autoresume import auto_resume_strategies
 from valuecell.utils.uuid import generate_conversation_id
 
@@ -44,6 +45,12 @@ def create_strategy_agent_router() -> APIRouter:
         Runs as a background task so the server starts accepting requests
         immediately — auto-resume should not block the HTTP listener.
         """
+        # Load secrets from GCP Secret Manager before auto-resume so that
+        # exchange credentials are available in os.environ for injection.
+        gcp_secret_name = os.environ.get("GCP_SECRET_NAME")
+        if gcp_secret_name:
+            load_gcp_secret_to_env(gcp_secret_name)
+
         try:
             asyncio.create_task(auto_resume_strategies(orchestrator))
         except Exception:
