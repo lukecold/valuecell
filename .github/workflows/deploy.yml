@@ -105,9 +105,22 @@ jobs:
             upsert_env VALUECELL_DATABASE_URL "${VALUECELL_DATABASE_URL:-}"
             upsert_env GCP_SECRET_NAME "${GCP_SECRET_NAME:-}"
 
+            # Ensure swap exists so docker pull doesn't OOM the e2-micro (1 GB RAM)
+            if [ ! -f /swapfile ]; then
+              sudo fallocate -l 2G /swapfile
+              sudo chmod 600 /swapfile
+              sudo mkswap /swapfile
+              sudo swapon /swapfile
+              echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+              echo "✓ Created 2 GB swap"
+            fi
+
             # Log in to GHCR so Docker can pull the image
             echo "${{ secrets.GITHUB_TOKEN }}" | \
               docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Stop the running container before pulling to free RAM for the download
+            docker compose down || true
 
             GHCR_OWNER=${{ secrets.GHCR_OWNER || github.repository_owner }} \
               docker compose pull
