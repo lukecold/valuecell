@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from importlib import import_module
@@ -73,8 +74,11 @@ _LOCAL_AGENT_CLASS_CACHE: Dict[str, Type[Any]] = {}
 
 # Global thread pool for offloading imports. Using a fixed executor allows
 # better control and avoids unbounded thread creation when many imports are
-# requested concurrently.
-executor = ThreadPoolExecutor(max_workers=4)
+# requested concurrently. Configurable via AGENT_THREAD_WORKERS env var;
+# default is 1 on resource-constrained hosts (e.g. e2-micro).
+executor = ThreadPoolExecutor(
+    max_workers=int(os.environ.get("AGENT_THREAD_WORKERS", "1"))
+)
 
 
 def _resolve_local_agent_class_sync(spec: str) -> Optional[Type[Any]]:

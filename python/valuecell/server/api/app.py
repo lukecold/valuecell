@@ -108,7 +108,16 @@ def create_app() -> FastAPI:
         except Exception as e:
             logger.info(f"✗ Database initialization error: {e}")
 
-        # Initialize and configure adapters
+        # Initialize and configure adapters.
+        # Set DISABLE_STOCK_ADAPTERS=1 to skip AKShare and BaoStock (Chinese
+        # stock data adapters). Safe to skip for crypto-only StrategyAgent
+        # deployments — saves ~200 MB RAM and several seconds of startup time.
+        _disable_stock = os.environ.get("DISABLE_STOCK_ADAPTERS", "0") not in (
+            "0",
+            "",
+            "false",
+            "False",
+        )
         try:
             logger.info("Configuring data adapters...")
             manager = get_adapter_manager()
@@ -120,21 +129,25 @@ def create_app() -> FastAPI:
             except Exception as e:
                 logger.info(f"✗ Yahoo Finance adapter failed: {e}")
 
-            # Configure AKShare (free, no API key required, optimized)
-            try:
-                manager.configure_akshare()
-                logger.info("✓ AKShare adapter configured (optimized)")
-            except Exception as e:
-                logger.info(f"✗ AKShare adapter failed: {e}")
+            if _disable_stock:
+                logger.info(
+                    "⚡ Skipping AKShare + BaoStock adapters (DISABLE_STOCK_ADAPTERS=1)"
+                )
+            else:
+                # Configure AKShare (free, no API key required, optimized)
+                try:
+                    manager.configure_akshare()
+                    logger.info("✓ AKShare adapter configured (optimized)")
+                except Exception as e:
+                    logger.info(f"✗ AKShare adapter failed: {e}")
 
-            # Configure BaoStock (free, no API key required)
-            try:
-                manager.configure_baostock()
-                print("✓ BaoStock adapter configured")
-            except Exception as e:
-                print(f"✗ BaoStock adapter failed: {e}")
+                # Configure BaoStock (free, no API key required)
+                try:
+                    manager.configure_baostock()
+                    logger.info("✓ BaoStock adapter configured")
+                except Exception as e:
+                    logger.info(f"✗ BaoStock adapter failed: {e}")
 
-            print("Data adapters configuration completed")
             logger.info("Data adapters configuration completed")
 
         except Exception as e:

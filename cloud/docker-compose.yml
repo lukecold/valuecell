@@ -38,6 +38,17 @@ services:
       #   echo "GCP_PROJECT_ID=<your-project-id>" >> /opt/valuecell/.env
       # The VM service account needs the "Secret Manager Secret Accessor" IAM role.
       GCP_SECRET_NAME: ${GCP_SECRET_NAME:-}
+      # ── Resource optimisation (e2-micro / constrained hosts) ──────────────────
+      # Skip Chinese-stock adapters (AKShare, BaoStock) — not needed for crypto.
+      DISABLE_STOCK_ADAPTERS: "1"
+      # Run market-data fetches one-at-a-time instead of concurrently.
+      SEQUENTIAL_DATA_FETCH: "1"
+      # Decision-cycle hard timeout in seconds (default 900 = 15 min).
+      # Increase if deepseek-reasoner regularly exceeds this limit.
+      STRATEGY_CYCLE_TIMEOUT_S: "900"
+      # Thread-pool workers for agent-class resolution (1 is enough for a
+      # single StrategyAgent deployment).
+      AGENT_THREAD_WORKERS: "1"
       # ── Exchange credentials (for live trading auto-resume) ────────────────────
       # Alternative to GCP secrets: set keys directly in /opt/valuecell/.env.
       # Convention: {EXCHANGE_ID_UPPER}_API_KEY / _SECRET_KEY / _PASSPHRASE

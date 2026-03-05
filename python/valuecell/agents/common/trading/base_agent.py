@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, AsyncGenerator, Dict, Optional
 
@@ -252,11 +253,11 @@ class BaseStrategyAgent(BaseAgent, ABC):
         # A transient network error or a temporary LLM outage should not
         # permanently kill the strategy; only persistent failures do.
         _MAX_CONSECUTIVE_ERRORS = 3
-        # Hard timeout per cycle (features + LLM + execution). A hanging
-        # network call would keep the strategy in "running" state forever
-        # without this guard.
-        _CYCLE_TIMEOUT_S = 300  # 5 minutes
-        # Back-off delay between retries (doubles each time, capped at 5 min).
+        # Hard timeout per cycle (features + LLM + execution). Configurable via
+        # STRATEGY_CYCLE_TIMEOUT_S env var. Default is 900 s (15 min) to give
+        # chain-of-thought models (e.g. deepseek-reasoner) enough headroom.
+        _CYCLE_TIMEOUT_S = int(os.environ.get("STRATEGY_CYCLE_TIMEOUT_S", "900"))
+        # Back-off delay between retries (doubles each time, capped at cycle timeout).
         _RETRY_BASE_DELAY_S = 30
 
         stop_reason = StopReason.NORMAL_EXIT

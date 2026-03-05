@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import itertools
+import os
 from typing import List, Optional
 
 from loguru import logger
@@ -77,18 +78,36 @@ class DefaultFeaturesPipeline(BaseFeaturesPipeline):
                 market_snapshot, self._request.exchange_config.exchange_id
             )
 
-        logger.info(
-            f"Starting concurrent data fetching for {len(self._candle_configurations)} candle sets and markets snapshot..."
+        # SEQUENTIAL_DATA_FETCH=1 disables asyncio.gather() and runs each fetch
+        # one-at-a-time. Useful on memory-constrained hosts (e.g. e2-micro) where
+        # concurrent connections create contention. Default is concurrent.
+        _sequential = os.environ.get("SEQUENTIAL_DATA_FETCH", "0") not in (
+            "0",
+            "",
+            "false",
+            "False",
         )
-        tasks = [
-            _fetch_candles(config.interval, config.lookback)
-            for config in self._candle_configurations
-        ]
-        tasks.append(_fetch_market_features())
 
-        # results = [ [candle_features_1], [candle_features_2], ..., [market_features] ]
-        results = await asyncio.gather(*tasks)
-        logger.info("Concurrent data fetching complete.")
+        if _sequential:
+            logger.info(
+                f"Starting sequential data fetching for {len(self._candle_configurations)} candle sets and markets snapshot..."
+            )
+            results = []
+            for config in self._candle_configurations:
+                results.append(await _fetch_candles(config.interval, config.lookback))
+            results.append(await _fetch_market_features())
+        else:
+            logger.info(
+                f"Starting concurrent data fetching for {len(self._candle_configurations)} candle sets and markets snapshot..."
+            )
+            tasks = [
+                _fetch_candles(config.interval, config.lookback)
+                for config in self._candle_configurations
+            ]
+            tasks.append(_fetch_market_features())
+            results = await asyncio.gather(*tasks)
+
+        logger.info("Data fetching complete.")
 
         market_features: List[FeatureVector] = results.pop()
 
