@@ -69,7 +69,7 @@ services:
       retries: 3
       start_period: 30s
     logging:
-      driver: "json-file"
+      driver: "gcplogs"
       options:
-        max-size: "20m"
-        max-file: "5"
+        gcp-log-cmd: "true"
+        labels: "app"
