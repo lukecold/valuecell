@@ -1,6 +1,7 @@
 """FastAPI application factory for ValueCell Server."""
 
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -178,6 +179,54 @@ def create_app() -> FastAPI:
     return app
 
 
+_ACCESS_WATCH_PREFIXES = (
+    "/agent/",
+    "/api/v1/strategies/",
+)
+
+
+class _SelectiveAccessLog:
+    """Raw ASGI middleware — logs only watched paths when status != 200.
+
+    Replaces uvicorn's access log entirely (uvicorn is started with
+    access_log=False / --no-access-log).  Watched paths:
+        /agent/*               — agent stream / StrategyAgent
+        /api/v1/strategies/*   — strategy CRUD & control endpoints
+    Only non-200 responses are emitted so routine polling noise is suppressed.
+    """
+
+    __slots__ = ("app",)
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path: str = scope.get("path", "")
+        if not any(path.startswith(p) for p in _ACCESS_WATCH_PREFIXES):
+            await self.app(scope, receive, send)
+            return
+
+        status_code = 0
+        t0 = time.perf_counter()
+
+        async def _send(message):
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+            await send(message)
+
+        await self.app(scope, receive, _send)
+
+        if status_code != 200:
+            method = scope.get("method", "-")
+            ms = (time.perf_counter() - t0) * 1000
+            logger.warning("{} {} → {} ({:.0f}ms)", method, path, status_code, ms)
+
+
 def _add_middleware(app: FastAPI, settings) -> None:
     """Add middleware to the application."""
     # CORS middleware
@@ -189,7 +238,9 @@ def _add_middleware(app: FastAPI, settings) -> None:
         allow_headers=["*"],
     )
 
-    # Custom logging middleware removed
+    # Selective access log: only watched paths, only non-200 responses.
+    # Uvicorn's own access log is disabled (see main.py / Dockerfile.cloud).
+    app.add_middleware(_SelectiveAccessLog)
 
 
 def _add_exception_handlers(app: FastAPI) -> None:

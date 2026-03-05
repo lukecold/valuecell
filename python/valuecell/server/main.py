@@ -53,6 +53,7 @@ def main() -> None:
         host=settings.API_HOST,
         port=settings.API_PORT,
         log_level="debug" if settings.API_DEBUG else "info",
+        access_log=False,
     )
     server = uvicorn.Server(config)
     server.install_signal_handlers = False

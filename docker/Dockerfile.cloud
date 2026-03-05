@@ -54,4 +54,4 @@ ENV FRONTEND_BUILD_DIR=/app/static
 # by calling uvicorn directly, which is also slightly faster to start.
 EXPOSE 8080
 
-CMD ["sh", "-c", "exec uv run uvicorn valuecell.server.api.app:app --host 0.0.0.0 --port ${PORT:-8080}"]
+CMD ["sh", "-c", "exec uv run uvicorn valuecell.server.api.app:app --host 0.0.0.0 --port ${PORT:-8080} --no-access-log"]
