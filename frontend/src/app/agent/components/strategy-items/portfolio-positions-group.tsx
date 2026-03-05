@@ -216,7 +216,7 @@ const PortfolioPositionsGroup: FC<PortfolioPositionsGroupProps> = ({
           </div>
         </div>
 
-        <div className="min-h-[400px] flex-1">
+        <div className="h-[250px] md:h-[400px]">
           {hasPriceCurve ? (
             <MultiLineChart data={priceCurve} showLegend={false} />
           ) : (

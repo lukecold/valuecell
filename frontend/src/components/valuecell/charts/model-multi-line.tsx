@@ -157,7 +157,15 @@ function ModelMultiLine({
       lazyUpdate: true,
     });
 
+    // ResizeObserver handles: tab visibility changes, panel resizing,
+    // and the initial case where the container was hidden (height=0) at mount.
+    const observer = new ResizeObserver(() => {
+      chartInstance.current?.resize();
+    });
+    observer.observe(chartRef.current);
+
     return () => {
+      observer.disconnect();
       chartInstance.current?.dispose();
     };
   }, [option]);

@@ -179,6 +179,11 @@
       "siliconflow": "硅基流动"
     },
     "title": "交易策略",
+    "tabs": {
+      "strategies": "策略",
+      "history": "历史",
+      "portfolio": "持仓"
+    },
     "add": "添加交易策略",
     "noStrategies": "暂无交易策略",
     "createFirst": "创建您的第一个策略以开始交易",
@@ -209,7 +214,7 @@
     "portfolio": {
       "title": "投资组合价值历史",
       "totalEquity": "总权益",
-      "availableBalance": "可用余额",
+      "availableBalance": "可用",
       "totalPnl": "总盈亏",
       "noData": "暂无投资组合价值数据",
       "noDataDesc": "交易开始后将显示投资组合价值图表"

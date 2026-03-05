@@ -179,6 +179,11 @@
       "siliconflow": "SiliconFlow"
     },
     "title": "Trading Strategies",
+    "tabs": {
+      "strategies": "Strategies",
+      "history": "History",
+      "portfolio": "Portfolio"
+    },
     "add": "Add trading strategy",
     "noStrategies": "No trading strategies",
     "createFirst": "Create your first strategy to start trading",
@@ -209,7 +214,7 @@
     "portfolio": {
       "title": "Portfolio Value History",
       "totalEquity": "Total Equity",
-      "availableBalance": "Available Balance",
+      "availableBalance": "Available",
       "totalPnl": "Total P&L",
       "noData": "No portfolio value data",
       "noDataDesc": "Portfolio value chart will appear once trading begins"

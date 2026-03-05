@@ -179,6 +179,11 @@
       "siliconflow": "SiliconFlow"
     },
     "title": "取引戦略",
+    "tabs": {
+      "strategies": "戦略",
+      "history": "履歴",
+      "portfolio": "ポートフォリオ"
+    },
     "add": "取引戦略を追加",
     "noStrategies": "取引戦略はありません",
     "createFirst": "最初の戦略を作成して取引を開始しましょう",
@@ -209,7 +214,7 @@
     "portfolio": {
       "title": "ポートフォリオ価値履歴",
       "totalEquity": "総資本",
-      "availableBalance": "利用可能残高",
+      "availableBalance": "残高",
       "totalPnl": "総損益",
       "noData": "ポートフォリオ価値データなし",
       "noDataDesc": "取引が開始されるとポートフォリオ価値チャートが表示されます"

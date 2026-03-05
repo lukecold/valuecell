@@ -221,7 +221,7 @@ const StrategyComposeList: FC<StrategyComposeListProps> = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <div className="flex w-[420px] flex-col overflow-hidden border-border border-r bg-card">
+    <div className="flex w-full flex-col overflow-hidden border-border border-r bg-card md:w-[420px]">
       <div className="flex items-center justify-between px-6 py-4">
         <h3 className="font-semibold text-base text-foreground">
           {t("strategy.history.title")}
