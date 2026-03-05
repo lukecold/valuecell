@@ -112,12 +112,22 @@ class CCXTExecutionGateway(BaseExecutionGateway):
             )
 
         # Build configuration based on exchange type
+        default_type = self._choose_default_type_for_exchange()
+        options: dict = {
+            "defaultType": default_type,
+            **self._ccxt_options,
+        }
+
+        # For Binance USDT-M futures ("future" / "swap"), restrict market loading
+        # to linear (USDT-M) markets only. Without this, ccxt loads ALL sub-exchanges
+        # including coin-margined futures (dapi.binance.com) and spot, which can
+        # time out from certain regions and block the strategy decision loop.
+        if self.exchange_id == "binance" and default_type == "future":
+            options.setdefault("fetchMarkets", ["linear"])
+
         config = {
             "enableRateLimit": True,  # Respect rate limits
-            "options": {
-                "defaultType": self._choose_default_type_for_exchange(),
-                **self._ccxt_options,
-            },
+            "options": options,
         }
 
         # Hyperliquid uses wallet-based authentication
