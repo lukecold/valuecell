@@ -29,6 +29,15 @@ if TYPE_CHECKING:
     from valuecell.agents.common.trading.features.interfaces import BaseFeaturesPipeline
 
 
+class _ConsecutiveTimeoutError(RuntimeError):
+    """Raised when decision cycles time out too many times in a row.
+
+    Kept private to this module; callers should catch it before the generic
+    Exception handler so the correct stop reason (CONSECUTIVE_TIMEOUT rather
+    than ERROR) is recorded in strategy metadata.
+    """
+
+
 class BaseStrategyAgent(BaseAgent, ABC):
     """Abstract base class for strategy agents.
 
@@ -285,7 +294,7 @@ class BaseStrategyAgent(BaseAgent, ABC):
                         _MAX_CONSECUTIVE_ERRORS,
                     )
                     if consecutive_errors >= _MAX_CONSECUTIVE_ERRORS:
-                        raise RuntimeError(
+                        raise _ConsecutiveTimeoutError(
                             f"Cycle timed out {consecutive_errors} times in a row"
                         ) from timeout_err
                     delay = min(
@@ -358,6 +367,15 @@ class BaseStrategyAgent(BaseAgent, ABC):
             stop_reason = StopReason.CANCELLED
             logger.info("Strategy {} cancelled", strategy_id)
             raise
+        except _ConsecutiveTimeoutError as err:
+            # LLM / network timed out too many times in a row. This is a transient
+            # infrastructure issue, not a logic error — mark as CONSECUTIVE_TIMEOUT
+            # so auto-resume can pick it up on the next container restart.
+            stop_reason = StopReason.CONSECUTIVE_TIMEOUT
+            logger.warning(
+                "Strategy {} stopped due to consecutive timeouts: {}", strategy_id, err
+            )
+            stop_reason_detail = str(err)
         except Exception as err:  # noqa: BLE001
             stop_reason = StopReason.ERROR
             logger.exception("StrategyAgent background run failed: {}", err)

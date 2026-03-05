@@ -209,7 +209,8 @@
       "confirm": "確認",
       "publish": "發布",
       "shareToSocial": "分享到社交媒體",
-      "shareToRanking": "分享到排行榜"
+      "shareToRanking": "分享到排行榜",
+      "restart": "重新啟動"
     },
     "portfolio": {
       "title": "投資組合價值歷史",

@@ -1,4 +1,4 @@
-import { Copy, Eye, MoreVertical, Plus, TrendingUp } from "lucide-react";
+import { Copy, Eye, MoreVertical, Plus, RotateCcw, TrendingUp } from "lucide-react";
 import { type FC, memo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useStrategyPerformance } from "@/api/strategy";
@@ -45,6 +45,7 @@ interface TradeStrategyCardProps {
   onClick?: () => void;
   onStop?: () => void;
   onDelete?: () => void;
+  onRestart?: () => void;
 }
 
 interface TradeStrategyGroupProps {
@@ -53,6 +54,7 @@ interface TradeStrategyGroupProps {
   onStrategySelect?: (strategy: Strategy) => void;
   onStrategyStop?: (strategyId: number) => void;
   onStrategyDelete?: (strategyId: number) => void;
+  onStrategyRestart?: (strategyId: number) => void;
 }
 
 const TradeStrategyCard: FC<TradeStrategyCardProps> = ({
@@ -61,6 +63,7 @@ const TradeStrategyCard: FC<TradeStrategyCardProps> = ({
   onClick,
   onStop,
   onDelete,
+  onRestart,
 }) => {
   const { t } = useTranslation();
   const stockColors = useStockColors();
@@ -124,17 +127,39 @@ const TradeStrategyCard: FC<TradeStrategyCardProps> = ({
 
         {/* Status Badge */}
         <div className="flex items-center gap-2">
-          {strategy.status === "stopped" && strategy.stop_reason ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
+          {strategy.status === "stopped" ? (
+            <div className="flex items-center gap-1">
+              {strategy.stop_reason ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="font-medium text-muted-foreground text-sm">
+                      {t("strategy.status.stopped")}
+                    </p>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="wrap-break-word max-w-xs">
+                    {strategy.stop_reason}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
                 <p className="font-medium text-muted-foreground text-sm">
                   {t("strategy.status.stopped")}
                 </p>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="wrap-break-word max-w-xs">
-                {strategy.stop_reason}
-              </TooltipContent>
-            </Tooltip>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-1.5 rounded-md px-2 py-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRestart?.();
+                }}
+              >
+                <RotateCcw className="size-3.5" />
+                <p className="font-medium text-sm">
+                  {t("strategy.action.restart")}
+                </p>
+              </Button>
+            </div>
           ) : (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -276,6 +301,7 @@ const TradeStrategyGroup: FC<TradeStrategyGroupProps> = ({
   onStrategySelect,
   onStrategyStop,
   onStrategyDelete,
+  onStrategyRestart,
 }) => {
   const { t } = useTranslation();
   const hasStrategies = strategies.length > 0;
@@ -294,6 +320,7 @@ const TradeStrategyGroup: FC<TradeStrategyGroupProps> = ({
               onClick={() => onStrategySelect?.(strategy)}
               onStop={() => onStrategyStop?.(strategy.strategy_id)}
               onDelete={() => onStrategyDelete?.(strategy.strategy_id)}
+              onRestart={() => onStrategyRestart?.(strategy.strategy_id)}
             />
           ))}
         </div>

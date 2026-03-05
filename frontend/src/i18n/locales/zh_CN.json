@@ -209,7 +209,8 @@
       "confirm": "确认",
       "publish": "发布",
       "shareToSocial": "分享到社交媒体",
-      "shareToRanking": "分享到排行榜"
+      "shareToRanking": "分享到排行榜",
+      "restart": "重新启动"
     },
     "portfolio": {
       "title": "投资组合价值历史",

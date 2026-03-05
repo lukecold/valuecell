@@ -246,5 +246,9 @@ def _should_resume(strategy_row: Strategy) -> bool:
         # Graceful cancellation that is meant to auto-resume.
         if stop_reason == StopReason.CANCELLED.value:
             return True
+        # Consecutive LLM / network timeouts — transient infrastructure issue,
+        # not a strategy logic error. Safe to auto-resume on container restart.
+        if stop_reason == StopReason.CONSECUTIVE_TIMEOUT.value:
+            return True
 
     return False

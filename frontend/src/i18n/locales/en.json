@@ -209,7 +209,8 @@
       "confirm": "Confirm",
       "publish": "Publish",
       "shareToSocial": "Share to Social",
-      "shareToRanking": "Share to Ranking"
+      "shareToRanking": "Share to Ranking",
+      "restart": "Restart"
     },
     "portfolio": {
       "title": "Portfolio Value History",

@@ -209,7 +209,8 @@
       "confirm": "確認",
       "publish": "公開",
       "shareToSocial": "SNSでシェア",
-      "shareToRanking": "ランキングでシェア"
+      "shareToRanking": "ランキングでシェア",
+      "restart": "再起動"
     },
     "portfolio": {
       "title": "ポートフォリオ価値履歴",

@@ -8,6 +8,7 @@ import {
   useGetStrategyList,
   useGetStrategyPortfolioSummary,
   useGetStrategyPriceCurve,
+  useRestartStrategy,
   useStopStrategy,
 } from "@/api/strategy";
 import CreateStrategyModal from "@/app/agent/components/strategy-items/modals/create-strategy-modal";
@@ -113,6 +114,7 @@ const StrategyAgentArea: FC<AgentViewProps> = () => {
 
   const { mutateAsync: stopStrategy } = useStopStrategy();
   const { mutateAsync: deleteStrategy } = useDeleteStrategy();
+  const { mutateAsync: restartStrategy } = useRestartStrategy();
 
   useEffect(() => {
     if (strategies.length === 0) {
@@ -211,6 +213,9 @@ const StrategyAgentArea: FC<AgentViewProps> = () => {
               }
               onStrategyDelete={async (strategyId) => {
                 await deleteStrategy(strategyId);
+              }}
+              onStrategyRestart={async (strategyId) => {
+                await restartStrategy(strategyId);
               }}
             />
           ) : (

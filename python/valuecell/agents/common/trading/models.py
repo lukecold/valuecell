@@ -432,6 +432,9 @@ class StopReason(str, Enum):
     ERROR = "error"
     ERROR_CLOSING_POSITIONS = "error_closing_positions"
     USER_STOPPED = "user_stopped"
+    # Transient: LLM / network timed out too many consecutive times.
+    # Unlike ERROR, this is considered resumable (the strategy logic itself is fine).
+    CONSECUTIVE_TIMEOUT = "consecutive_timeout"
 
 
 class Constraints(BaseModel):

@@ -28,7 +28,10 @@ from valuecell.server.api.schemas.base import ErrorResponse, StatusCode, Success
 from valuecell.server.db.connection import get_db
 from valuecell.server.db.repositories import get_strategy_repository
 from valuecell.server.services.gcp_secrets import load_gcp_secret_to_env
-from valuecell.server.services.strategy_autoresume import auto_resume_strategies
+from valuecell.server.services.strategy_autoresume import (
+    auto_resume_strategies,
+    _resume_one,
+)
 from valuecell.utils.uuid import generate_conversation_id
 
 
@@ -367,6 +370,60 @@ def create_strategy_agent_router() -> APIRouter:
         except Exception as e:
             raise HTTPException(
                 status_code=500, detail=f"Error deleting strategy: {str(e)}"
+            )
+
+    @router.post("/restart")
+    async def restart_strategy_agent(
+        id: str = Query(..., description="Strategy ID to restart"),
+        db: Session = Depends(get_db),
+    ):
+        """Restart a stopped strategy.
+
+        Clears any terminal stop_reason that would prevent auto-resume, then
+        immediately re-dispatches the strategy through the orchestrator (same
+        as auto-resume at startup). Only stopped strategies can be restarted.
+        """
+        try:
+            repo = get_strategy_repository(db_session=db)
+            strategy = repo.get_strategy_by_strategy_id(id)
+            if not strategy:
+                raise HTTPException(status_code=404, detail="Strategy not found")
+
+            current_status = getattr(strategy, "status", None)
+            if current_status == StrategyStatus.RUNNING.value:
+                return SuccessResponse.create(
+                    data={"strategy_id": id},
+                    msg=f"Strategy '{id}' is already running",
+                )
+
+            # Clear the stop_reason so the resume logic will accept it.
+            existing_meta = strategy.strategy_metadata or {}
+            updated_meta = {
+                **existing_meta,
+                "stop_reason": None,
+                "stop_reason_detail": None,
+            }
+            repo.upsert_strategy(
+                strategy_id=id,
+                status=StrategyStatus.STOPPED.value,
+                metadata=updated_meta,
+            )
+
+            # Re-fetch the updated row so _resume_one sees the cleared stop_reason
+            strategy = repo.get_strategy_by_strategy_id(id)
+
+            # Dispatch resume as a fire-and-forget background task
+            asyncio.create_task(_resume_one(orchestrator, strategy))
+
+            return SuccessResponse.create(
+                data={"strategy_id": id},
+                msg=f"Strategy '{id}' restart dispatched",
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Error restarting strategy: {str(e)}"
             )
 
     return router
