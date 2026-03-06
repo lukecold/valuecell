@@ -201,6 +201,64 @@ class StrategyRepository:
             if not self.db_session:
                 session.close()
 
+    def persist_portfolio_bulk(
+        self,
+        strategy_id: str,
+        cash: float,
+        total_value: float,
+        total_unrealized_pnl: Optional[float],
+        total_realized_pnl: Optional[float],
+        gross_exposure: Optional[float],
+        net_exposure: Optional[float],
+        snapshot_ts: Optional[datetime],
+        holdings: list,
+    ) -> bool:
+        """Insert portfolio snapshot + all holdings in a single transaction.
+
+        Replaces the pattern of calling add_portfolio_snapshot() once and
+        add_holding_item() N times (each with its own session open/commit/close)
+        with a single session that commits everything atomically.
+
+        *holdings* is a list of dicts with keys: symbol, type, leverage,
+        entry_price, quantity, unrealized_pnl, unrealized_pnl_pct.
+        """
+        ts = snapshot_ts or datetime.utcnow()
+        session = self._get_session()
+        try:
+            snapshot = StrategyPortfolioView(
+                strategy_id=strategy_id,
+                cash=cash,
+                total_value=total_value,
+                total_unrealized_pnl=total_unrealized_pnl,
+                total_realized_pnl=total_realized_pnl,
+                gross_exposure=gross_exposure,
+                net_exposure=net_exposure,
+                snapshot_ts=ts,
+            )
+            session.add(snapshot)
+            for h in holdings:
+                session.add(
+                    StrategyHolding(
+                        strategy_id=strategy_id,
+                        symbol=h["symbol"],
+                        type=h["type"],
+                        leverage=h.get("leverage"),
+                        entry_price=h.get("entry_price"),
+                        quantity=h["quantity"],
+                        unrealized_pnl=h.get("unrealized_pnl"),
+                        unrealized_pnl_pct=h.get("unrealized_pnl_pct"),
+                        snapshot_ts=ts,
+                    )
+                )
+            session.commit()
+            return True
+        except Exception:
+            session.rollback()
+            return False
+        finally:
+            if not self.db_session:
+                session.close()
+
     def get_latest_holdings(self, strategy_id: str) -> List[StrategyHolding]:
         """Get holdings for the latest snapshot of a strategy."""
         session = self._get_session()
@@ -647,6 +705,32 @@ class StrategyRepository:
 
             session.commit()
             return True
+        except Exception:
+            session.rollback()
+            return False
+        finally:
+            if not self.db_session:
+                session.close()
+
+
+    def update_metadata_only(self, strategy_id: str, metadata: dict) -> bool:
+        """Update strategy_metadata via a direct UPDATE — no prior SELECT required.
+
+        Use this in hot paths (e.g., per-cycle summary persistence) where the
+        strategy is known to exist and a full upsert round-trip is wasteful.
+        Returns True if a row was matched and updated, False otherwise.
+        """
+        from sqlalchemy import update as sa_update
+
+        session = self._get_session()
+        try:
+            result = session.execute(
+                sa_update(Strategy)
+                .where(Strategy.strategy_id == strategy_id)
+                .values(strategy_metadata=metadata)
+            )
+            session.commit()
+            return result.rowcount > 0
         except Exception:
             session.rollback()
             return False

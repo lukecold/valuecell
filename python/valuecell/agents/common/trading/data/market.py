@@ -58,28 +58,22 @@ class SimpleMarketDataSource(BaseMarketDataSource):
     async def get_recent_candles(
         self, symbols: List[str], interval: str, lookback: int
     ) -> List[Candle]:
-        async def _fetch_and_process(symbol: str) -> List[Candle]:
-            # instantiate exchange class by name (e.g., ccxtpro.kraken)
-            exchange_cls = get_exchange_cls(self._exchange_id)
-            exchange = exchange_cls({"newUpdates": False})
+        # Share one exchange instance across all symbols so load_markets() is
+        # called only once per invocation instead of once per symbol.
+        exchange_cls = get_exchange_cls(self._exchange_id)
+        exchange = exchange_cls({"newUpdates": False})
 
+        async def _fetch_and_process(symbol: str) -> List[Candle]:
             symbol_candles: List[Candle] = []
             normalized_symbol = self._normalize_symbol(symbol)
             try:
-                try:
-                    # ccxt.pro uses async fetch_ohlcv with normalized symbol
-                    raw = await exchange.fetch_ohlcv(
-                        normalized_symbol,
-                        timeframe=interval,
-                        since=None,
-                        limit=lookback,
-                    )
-                finally:
-                    try:
-                        await exchange.close()
-                    except Exception:
-                        pass
-
+                # ccxt.pro uses async fetch_ohlcv with normalized symbol
+                raw = await exchange.fetch_ohlcv(
+                    normalized_symbol,
+                    timeframe=interval,
+                    since=None,
+                    limit=lookback,
+                )
                 # raw is list of [ts, open, high, low, close, volume]
                 for row in raw:
                     ts, open_v, high_v, low_v, close_v, vol = row
@@ -111,9 +105,15 @@ class SimpleMarketDataSource(BaseMarketDataSource):
                 )
                 return []
 
-        # Run fetch for each symbol concurrently
-        tasks = [_fetch_and_process(symbol) for symbol in symbols]
-        results = await asyncio.gather(*tasks)
+        try:
+            # Run fetch for each symbol concurrently on the shared exchange instance
+            tasks = [_fetch_and_process(symbol) for symbol in symbols]
+            results = await asyncio.gather(*tasks)
+        finally:
+            try:
+                await exchange.close()
+            except Exception:
+                pass
 
         # Flatten the list of lists results into a single list of candles
         candles: List[Candle] = list(itertools.chain.from_iterable(results))
@@ -204,44 +204,53 @@ class SimpleMarketDataSource(BaseMarketDataSource):
         }
         ```
         """
-        snapshot = defaultdict(dict)
+        snapshot: dict = {}
 
         exchange_cls = get_exchange_cls(self._exchange_id)
         exchange = exchange_cls({"newUpdates": False})
-        try:
-            for symbol in symbols:
-                sym = normalize_symbol(symbol)
+
+        async def _fetch_symbol(symbol: str) -> None:
+            sym = normalize_symbol(symbol)
+            data: dict = {}
+            try:
+                ticker = await exchange.fetch_ticker(sym)
+                data["price"] = ticker
+                logger.debug(f"Fetch market snapshot for {sym} data: {data}")
+            except Exception:
+                logger.exception(
+                    "Failed to fetch market snapshot for {} at {}",
+                    symbol,
+                    self._exchange_id,
+                )
+                return
+
+            # best-effort: open interest and funding rate in parallel
+            async def _fetch_oi() -> None:
                 try:
-                    ticker = await exchange.fetch_ticker(sym)
-                    snapshot[symbol]["price"] = ticker
-
-                    # best-effort: warm other endpoints (open interest / funding)
-                    try:
-                        oi = await exchange.fetch_open_interest(sym)
-                        snapshot[symbol]["open_interest"] = oi
-                    except Exception:
-                        logger.exception(
-                            "Failed to fetch open interest for {} at {}",
-                            symbol,
-                            self._exchange_id,
-                        )
-
-                    try:
-                        fr = await exchange.fetch_funding_rate(sym)
-                        snapshot[symbol]["funding_rate"] = fr
-                    except Exception:
-                        logger.exception(
-                            "Failed to fetch funding rate for {} at {}",
-                            symbol,
-                            self._exchange_id,
-                        )
-                    logger.debug(f"Fetch market snapshot for {sym} data: {snapshot}")
+                    data["open_interest"] = await exchange.fetch_open_interest(sym)
                 except Exception:
                     logger.exception(
-                        "Failed to fetch market snapshot for {} at {}",
+                        "Failed to fetch open interest for {} at {}",
                         symbol,
                         self._exchange_id,
                     )
+
+            async def _fetch_fr() -> None:
+                try:
+                    data["funding_rate"] = await exchange.fetch_funding_rate(sym)
+                except Exception:
+                    logger.exception(
+                        "Failed to fetch funding rate for {} at {}",
+                        symbol,
+                        self._exchange_id,
+                    )
+
+            await asyncio.gather(_fetch_oi(), _fetch_fr())
+            snapshot[symbol] = data
+
+        try:
+            # Fetch all symbols concurrently on the shared exchange instance
+            await asyncio.gather(*[_fetch_symbol(s) for s in symbols])
         finally:
             try:
                 await exchange.close()
@@ -251,4 +260,4 @@ class SimpleMarketDataSource(BaseMarketDataSource):
                     self._exchange_id,
                 )
 
-        return dict(snapshot)
+        return snapshot

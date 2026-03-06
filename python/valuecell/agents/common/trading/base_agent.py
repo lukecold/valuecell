@@ -349,13 +349,16 @@ class BaseStrategyAgent(BaseAgent, ABC):
                     request.trading_config.decide_interval,
                 )
 
-                # Sleep in 1s increments so we can react to controller stop
-                # and to cancellation promptly instead of blocking for the
-                # whole interval at once.
-                for _ in range(request.trading_config.decide_interval):
+                # Sleep in 10s chunks to react to stop signals while avoiding
+                # one DB query per second (600 queries per 10-min interval).
+                _SLEEP_CHECK_INTERVAL_S = 10
+                remaining = request.trading_config.decide_interval
+                while remaining > 0:
+                    chunk = min(_SLEEP_CHECK_INTERVAL_S, remaining)
+                    await asyncio.sleep(chunk)
+                    remaining -= chunk
                     if not controller.is_running():
                         break
-                    await asyncio.sleep(1)
 
             logger.info(
                 "Strategy_id={} is no longer running, exiting decision loop",

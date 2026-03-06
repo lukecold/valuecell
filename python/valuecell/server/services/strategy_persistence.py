@@ -18,17 +18,6 @@ def persist_trade_history(
     """
     repo = get_strategy_repository()
     try:
-        # Skip if strategy does not exist (e.g., deleted)
-        try:
-            if repo.get_strategy_by_strategy_id(strategy_id) is None:
-                logger.info(
-                    "Skip persisting trade detail: strategy={} not found (possibly deleted)",
-                    strategy_id,
-                )
-                return None
-        except Exception:
-            # If existence check fails, proceed but errors will be handled below
-            pass
         # map direction and type
         ttype = trade.type.value if trade.type is not None else None
         side = trade.side.value if trade.side is not None else None
@@ -133,22 +122,12 @@ def persist_trade_history(
 def persist_portfolio_view(view: agent_models.PortfolioView) -> bool:
     """Persist PortfolioView.positions into strategy_holdings (one row per symbol snapshot).
 
-    Writes each position as a `StrategyHolding` snapshot with current timestamp if not provided.
+    Writes portfolio summary + all position holdings in a single DB transaction
+    so the entire cycle snapshot is atomic and only one session is opened.
     """
     repo = get_strategy_repository()
     strategy_id = view.strategy_id
     try:
-        # Skip if strategy does not exist (e.g., deleted)
-        try:
-            if repo.get_strategy_by_strategy_id(strategy_id) is None:
-                logger.info(
-                    "Skip persisting portfolio view: strategy={} not found (possibly deleted)",
-                    strategy_id,
-                )
-                return False
-        except Exception:
-            # If existence check fails, continue and let foreign key constraints guard writes
-            pass
         if not strategy_id:
             logger.error("persist_portfolio_view missing strategy_id on view")
             return False
@@ -178,7 +157,26 @@ def persist_portfolio_view(view: agent_models.PortfolioView) -> bool:
             float(view.net_exposure) if view.net_exposure is not None else None
         )
 
-        portfolio_item = repo.add_portfolio_snapshot(
+        holdings = []
+        for symbol, pos in view.positions.items():
+            ttype = (
+                pos.trade_type.value
+                if pos.trade_type
+                else ("LONG" if pos.quantity >= 0 else "SHORT")
+            )
+            holdings.append(
+                {
+                    "symbol": symbol,
+                    "type": ttype,
+                    "leverage": float(pos.leverage) if pos.leverage is not None else None,
+                    "entry_price": float(pos.avg_price) if pos.avg_price is not None else None,
+                    "quantity": abs(float(pos.quantity)),
+                    "unrealized_pnl": float(pos.unrealized_pnl) if pos.unrealized_pnl is not None else None,
+                    "unrealized_pnl_pct": float(pos.unrealized_pnl_pct) if pos.unrealized_pnl_pct is not None else None,
+                }
+            )
+
+        ok = repo.persist_portfolio_bulk(
             strategy_id=strategy_id,
             cash=cash,
             total_value=total_value,
@@ -187,71 +185,61 @@ def persist_portfolio_view(view: agent_models.PortfolioView) -> bool:
             gross_exposure=gross_exposure,
             net_exposure=net_exposure,
             snapshot_ts=snapshot_ts,
+            holdings=holdings,
         )
-        if portfolio_item is None:
+        if not ok:
             logger.warning(
                 "Failed to persist strategy portfolio snapshot for {}", strategy_id
             )
-
-        for symbol, pos in view.positions.items():
-            # pos is PositionSnapshot
-            ttype = (
-                pos.trade_type.value
-                if pos.trade_type
-                else ("LONG" if pos.quantity >= 0 else "SHORT")
-            )
-            repo.add_holding_item(
-                strategy_id=strategy_id,
-                symbol=symbol,
-                type=ttype,
-                leverage=float(pos.leverage) if pos.leverage is not None else None,
-                entry_price=float(pos.avg_price) if pos.avg_price is not None else None,
-                quantity=abs(float(pos.quantity)),
-                unrealized_pnl=(
-                    float(pos.unrealized_pnl)
-                    if pos.unrealized_pnl is not None
-                    else None
-                ),
-                unrealized_pnl_pct=(
-                    float(pos.unrealized_pnl_pct)
-                    if pos.unrealized_pnl_pct is not None
-                    else None
-                ),
-                snapshot_ts=snapshot_ts,
-            )
-        return True
+        return ok
     except Exception:
         logger.exception("persist_portfolio_view failed for {}", strategy_id)
         return False
 
 
-def persist_strategy_summary(summary: agent_models.StrategySummary) -> bool:
+def persist_strategy_summary(
+    summary: agent_models.StrategySummary,
+    existing_meta: Optional[dict] = None,
+) -> bool:
     """Persist a StrategySummary into the Strategy.strategy_metadata JSON.
+
+    When *existing_meta* is supplied (from the caller's in-memory cache) the
+    function skips the DB read and uses a direct UPDATE, saving two round-trips
+    (SELECT + REFRESH) on every cycle. When not supplied it falls back to the
+    original read-then-write path for backward compatibility.
 
     Returns True on success, False on failure.
     """
     repo = get_strategy_repository()
     strategy_id = summary.strategy_id
     try:
-        # Only update existing strategies; do NOT recreate missing ones
-        strategy = repo.get_strategy_by_strategy_id(strategy_id)
-        if strategy is None:
-            logger.info(
-                "Skip persisting strategy summary: strategy={} not found (possibly deleted)",
-                strategy_id,
-            )
-            return False
+        summary_fields = summary.model_dump(
+            exclude_none=True,
+            exclude={"strategy_id", "status"},
+        )
 
-        existing_meta = strategy.strategy_metadata or {}
-        meta = {
-            **dict(existing_meta),
-            **summary.model_dump(
-                exclude_none=True,
-                exclude={"strategy_id", "status"},
-            ),
-        }
-        updated = repo.upsert_strategy(strategy_id, metadata=meta)
-        return updated is not None
+        if existing_meta is not None:
+            # Fast path: caller owns the cache — no DB read needed.
+            meta = {**existing_meta, **summary_fields}
+            ok = repo.update_metadata_only(strategy_id, meta)
+            if not ok:
+                logger.info(
+                    "Skip persisting strategy summary: strategy={} not found (possibly deleted)",
+                    strategy_id,
+                )
+            return ok
+        else:
+            # Slow path (first call / fallback): read existing metadata first.
+            strategy = repo.get_strategy_by_strategy_id(strategy_id)
+            if strategy is None:
+                logger.info(
+                    "Skip persisting strategy summary: strategy={} not found (possibly deleted)",
+                    strategy_id,
+                )
+                return False
+            meta = {**dict(strategy.strategy_metadata or {}), **summary_fields}
+            updated = repo.upsert_strategy(strategy_id, metadata=meta)
+            return updated is not None
     except Exception:
         logger.exception("persist_strategy_summary failed for {}", strategy_id)
         return False

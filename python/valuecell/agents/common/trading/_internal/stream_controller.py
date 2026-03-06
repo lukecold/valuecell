@@ -48,6 +48,10 @@ class StreamController:
         self.strategy_id = strategy_id
         self.timeout_s = timeout_s
         self._state = ControllerState.INITIALIZING
+        # In-memory cache of strategy_metadata — populated once after initial
+        # persist and kept in sync after every cycle. Avoids a DB SELECT on
+        # each per-cycle persist_strategy_summary call.
+        self._metadata_cache: dict = {}
 
     @property
     def state(self) -> ControllerState:
@@ -116,7 +120,10 @@ class StreamController:
 
             timestamp_ms = get_current_timestamp_ms()
             initial_summary = runtime.coordinator.build_summary(timestamp_ms, [])
-            ok = strategy_persistence.persist_strategy_summary(initial_summary)
+            # Use slow path (no cache yet) for the very first write so we don't
+            # overwrite any metadata that was set before this cycle started
+            # (e.g., by auto-resume logic).
+            ok = strategy_persistence.persist_strategy_summary(initial_summary, existing_meta=None)
             if ok:
                 logger.info(
                     "Persisted initial strategy summary for strategy={}",
@@ -181,6 +188,19 @@ class StreamController:
                 logger.exception(
                     "Error while updating DB initial capital from live balance for {}",
                     self.strategy_id,
+                )
+
+            # Seed the metadata cache from the DB after all initial writes so
+            # subsequent per-cycle persist_strategy_summary calls can skip the
+            # SELECT round-trip.
+            try:
+                repo = get_strategy_repository()
+                _s = repo.get_strategy_by_strategy_id(self.strategy_id)
+                if _s is not None:
+                    self._metadata_cache = dict(_s.strategy_metadata or {})
+            except Exception:
+                logger.warning(
+                    "Failed to seed metadata cache for strategy {}", self.strategy_id
                 )
         except Exception:
             logger.exception(
@@ -271,8 +291,18 @@ class StreamController:
                     "Persisted portfolio view for strategy={}", self.strategy_id
                 )
 
-            ok = strategy_persistence.persist_strategy_summary(result.strategy_summary)
+            # Pass the in-memory metadata cache so persist_strategy_summary can
+            # skip the DB SELECT and use a direct UPDATE instead.
+            ok = strategy_persistence.persist_strategy_summary(
+                result.strategy_summary, existing_meta=self._metadata_cache
+            )
             if ok:
+                # Keep local cache in sync with what was written to DB.
+                self._metadata_cache.update(
+                    result.strategy_summary.model_dump(
+                        exclude_none=True, exclude={"strategy_id", "status"}
+                    )
+                )
                 logger.info(
                     "Persisted strategy summary for strategy={}", self.strategy_id
                 )
@@ -388,19 +418,26 @@ class StreamController:
 
         Accept either a StopReason enum or a raw string; store the normalized
         string value in the DB metadata.
+        Uses the in-memory metadata cache to avoid a DB read; falls back to a
+        DB read if the cache is empty (e.g., strategy stopped before first cycle).
         """
         try:
             repo = get_strategy_repository()
-            strategy = repo.get_strategy_by_strategy_id(self.strategy_id)
-            if strategy is None:
-                return
-            metadata = dict(strategy.strategy_metadata or {})
+            if self._metadata_cache:
+                metadata = dict(self._metadata_cache)
+            else:
+                # Fallback: cache not yet populated (stopped before first persist)
+                strategy = repo.get_strategy_by_strategy_id(self.strategy_id)
+                if strategy is None:
+                    return
+                metadata = dict(strategy.strategy_metadata or {})
             metadata["stop_reason"] = getattr(reason, "value", reason)
             if reason_detail is not None:
                 metadata["stop_reason_detail"] = reason_detail
             else:
                 metadata.pop("stop_reason_detail", None)
-            repo.upsert_strategy(strategy_id=self.strategy_id, metadata=metadata)
+            repo.update_metadata_only(strategy_id=self.strategy_id, metadata=metadata)
+            self._metadata_cache = metadata
         except Exception:
             logger.warning(
                 "Failed to record stop reason for strategy %s", self.strategy_id
