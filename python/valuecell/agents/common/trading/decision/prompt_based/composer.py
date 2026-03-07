@@ -197,7 +197,9 @@ class LlmComposer(BaseComposer):
 
         instructions = (
             "Read Context and decide. "
-            "features.1m = structural trends (240 periods), features.1s = realtime signals (180 periods). "
+            "features.1d = daily trend (up to 60 daily bars, PRIMARY trend source — use 1d EMA for stop placement on daily-trend trades). "
+            "features.4h = 4-hour structure (up to 120 bars, opportunity identification). "
+            "features.1h = 1-hour intraday (up to 168 bars, entry refinement only). "
             "market.funding_rate: positive = longs pay shorts. "
             "Respect constraints and risk_flags. Prefer NOOP when edge unclear. "
             "Always include a concise top-level 'rationale'. "

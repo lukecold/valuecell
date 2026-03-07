@@ -49,10 +49,15 @@ class DefaultFeaturesPipeline(BaseFeaturesPipeline):
         self._candle_feature_computer = candle_feature_computer
         self._symbols = list(dict.fromkeys(request.trading_config.symbols))
         self._market_snapshot_computer = market_snapshot_computer
-        self._candle_configurations = candle_configurations
         self._candle_configurations = candle_configurations or [
-            CandleConfig(interval="1s", lookback=60 * 3),
-            CandleConfig(interval="1m", lookback=60 * 4),
+            # Daily candles — primary trend direction (EMA_12/26/50 = 12/26/50-day EMAs)
+            # This is the authoritative source for "daily trend" analysis; without it the
+            # LLM must infer daily trend from intraday data, leading to wrong stop levels.
+            CandleConfig(interval="1d", lookback=60),
+            # 4-hour candles — medium-term structure for opportunity identification
+            CandleConfig(interval="4h", lookback=120),
+            # 1-hour candles — intraday structure for entry timing
+            CandleConfig(interval="1h", lookback=168),
         ]
 
     async def build(self) -> FeaturesPipelineResult:
