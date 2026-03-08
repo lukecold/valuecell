@@ -120,15 +120,13 @@ class DefaultDecisionCoordinator(DecisionCoordinator):
                     portfolio.account_balance = float(free_cash)
                     portfolio.buying_power = max(0.0, float(portfolio.account_balance))
                 else:
-                    # Derivatives: Account Balance should be Wallet Balance or Equity.
-                    # We use total_cash (Equity) as the best approximation for account_balance
-                    # to ensure InMemoryPortfolioService calculates Equity correctly (Equity + Unrealized).
-                    # Note: If total_cash IS Equity, adding Unrealized PnL again in InMemoryService
-                    # (Equity = Balance + Unreal) would double count PnL.
-                    # However, separating Wallet Balance from Equity is exchange-specific.
-                    # For now, we set account_balance = total_cash and rely on the fixed
-                    # InMemoryPortfolioService to handle it (assuming Balance ~= Equity for initial sync).
-                    portfolio.account_balance = float(total_cash)
+                    # Derivatives: CCXT balance['total'] = marginBalance (= walletBalance + unrealizedPnl).
+                    # InMemoryPortfolioService computes equity = account_balance + unrealized_pnl,
+                    # so we must set account_balance = walletBalance (NOT marginBalance) to avoid
+                    # double-counting unrealized PnL.
+                    # We initially set a conservative estimate using free_cash (availableBalance);
+                    # it will be corrected to walletBalance once positions are fetched below.
+                    portfolio.account_balance = float(free_cash)  # initial estimate (availableBalance)
                     # Buying Power is explicit Free Margin
                     portfolio.buying_power = float(free_cash)
                     # Also update free_cash field in view if it exists
@@ -150,7 +148,14 @@ class DefaultDecisionCoordinator(DecisionCoordinator):
                     )
                     portfolio.total_unrealized_pnl = total_unrealized_pnl
                     if total_cash > 0:
-                        portfolio.total_value = total_cash + total_unrealized_pnl
+                        # total_cash = marginBalance = walletBalance + unrealizedPnl (CCXT convention).
+                        # Correct account_balance to walletBalance so apply_trades() computes:
+                        #   equity = walletBalance + unrealizedPnl = marginBalance ✓
+                        # Without this correction, apply_trades() would compute:
+                        #   equity = marginBalance + unrealizedPnl  (unrealized PnL counted twice!)
+                        wallet_balance = total_cash - total_unrealized_pnl
+                        portfolio.account_balance = float(max(0.0, wallet_balance))
+                        portfolio.total_value = float(total_cash)  # marginBalance = correct equity
         except Exception:
             # If syncing fails, continue with existing portfolio view
             logger.warning(
