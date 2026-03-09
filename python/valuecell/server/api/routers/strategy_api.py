@@ -8,6 +8,7 @@ from fastapi import APIRouter
 
 from .strategy import create_strategy_router
 from .strategy_agent import create_strategy_agent_router
+from .strategy_chat import create_strategy_chat_router
 from .strategy_prompts import create_strategy_prompts_router
 
 
@@ -22,5 +23,8 @@ def create_strategy_api_router() -> APIRouter:
 
     # Include strategy prompts endpoints (prefix: /strategies/prompts)
     router.include_router(create_strategy_prompts_router())
+
+    # Include strategy chat endpoint (prefix: /strategies)
+    router.include_router(create_strategy_chat_router())
 
     return router

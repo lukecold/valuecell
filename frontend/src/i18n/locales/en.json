@@ -182,7 +182,27 @@
     "tabs": {
       "strategies": "Strategies",
       "history": "History",
-      "portfolio": "Portfolio"
+      "portfolio": "Portfolio",
+      "chat": "Chat"
+    },
+    "chat": {
+      "placeholder": "Ask about decisions or strategy...",
+      "empty": "Ask the strategy to explain its decisions or suggest improvements.",
+      "error": "Failed to get a response. Please try again.",
+      "quick": {
+        "explain": "Explain the last decision",
+        "failures": "What went wrong in recent trades?",
+        "improve": "How can the strategy be improved?"
+      },
+      "proposal": {
+        "title": "Suggested Prompt Improvement",
+        "accept": "Accept",
+        "reject": "Dismiss",
+        "refine": "Refine",
+        "accepted": "Prompt updated",
+        "refinePlaceholder": "e.g. also add a trailing stop loss rule...",
+        "submitRefinement": "Submit Refinement"
+      }
     },
     "add": "Add trading strategy",
     "noStrategies": "No trading strategies",

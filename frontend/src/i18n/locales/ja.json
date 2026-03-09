@@ -182,7 +182,27 @@
     "tabs": {
       "strategies": "戦略",
       "history": "履歴",
-      "portfolio": "ポートフォリオ"
+      "portfolio": "ポートフォリオ",
+      "chat": "チャット"
+    },
+    "chat": {
+      "placeholder": "意思決定や戦略について質問...",
+      "empty": "戦略の決定を説明したり、改善を提案するよう依頼してください。",
+      "error": "応答の取得に失敗しました。もう一度お試しください。",
+      "quick": {
+        "explain": "最後の決定を説明してください",
+        "failures": "最近の取引で何が問題でしたか？",
+        "improve": "戦略はどのように改善できますか？"
+      },
+      "proposal": {
+        "title": "プロンプト改善の提案",
+        "accept": "承認",
+        "reject": "却下",
+        "refine": "改良",
+        "accepted": "プロンプトが更新されました",
+        "refinePlaceholder": "例：トレーリングストップルールも追加してください...",
+        "submitRefinement": "改良を送信"
+      }
     },
     "add": "取引戦略を追加",
     "noStrategies": "取引戦略はありません",

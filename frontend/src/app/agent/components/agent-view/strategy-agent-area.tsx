@@ -12,6 +12,7 @@ import {
   useStopStrategy,
 } from "@/api/strategy";
 import CreateStrategyModal from "@/app/agent/components/strategy-items/modals/create-strategy-modal";
+import StrategyChatPanel from "@/app/agent/components/strategy-items/strategy-chat-panel";
 import { Button } from "@/components/ui/button";
 import type { AgentViewProps } from "@/types/agent";
 import type { Strategy } from "@/types/strategy";
@@ -49,7 +50,8 @@ const EmptyIllustration = () => (
   </svg>
 );
 
-type MobileTab = "strategies" | "history";
+type MobileTab = "strategies" | "history" | "chat";
+type MiddleTab = "history" | "chat";
 
 // Mobile portfolio panel height constraints (px)
 const PORTFOLIO_DEFAULT_H = 440; // shows stats + chart on first open
@@ -64,6 +66,7 @@ const StrategyAgentArea: FC<AgentViewProps> = () => {
     null,
   );
   const [mobileTab, setMobileTab] = useState<MobileTab>("strategies");
+  const [middleTab, setMiddleTab] = useState<MiddleTab>("history");
   const [portfolioHeight, setPortfolioHeight] = useState(PORTFOLIO_DEFAULT_H);
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
@@ -138,6 +141,12 @@ const StrategyAgentArea: FC<AgentViewProps> = () => {
   const mobileTabs: { key: MobileTab; label: string }[] = [
     { key: "strategies", label: t("strategy.tabs.strategies") },
     { key: "history", label: t("strategy.tabs.history") },
+    { key: "chat", label: t("strategy.tabs.chat") },
+  ];
+
+  const middleTabs: { key: MiddleTab; label: string }[] = [
+    { key: "history", label: t("strategy.tabs.history") },
+    { key: "chat", label: t("strategy.tabs.chat") },
   ];
 
   return (
@@ -171,13 +180,17 @@ const StrategyAgentArea: FC<AgentViewProps> = () => {
         </div>
       )}
 
-      {/* Mobile-only tab bar — 2 tabs: Strategies | History */}
+      {/* Mobile-only tab bar — 3 tabs: Strategies | History | Chat */}
       <div className="flex shrink-0 border-b bg-card md:hidden">
         {mobileTabs.map((tab) => (
           <button
             key={tab.key}
             type="button"
-            onClick={() => setMobileTab(tab.key)}
+            onClick={() => {
+              setMobileTab(tab.key);
+              if (tab.key === "chat") setMiddleTab("chat");
+              else if (tab.key === "history") setMiddleTab("history");
+            }}
             className={`flex-1 border-b-2 py-3 text-sm font-medium transition-colors ${
               mobileTab === tab.key
                 ? "border-primary text-primary"
@@ -239,7 +252,7 @@ const StrategyAgentArea: FC<AgentViewProps> = () => {
           )}
         </div>
 
-        {/* Middle + Right: History + Portfolio */}
+        {/* Middle + Right: History/Chat + Portfolio */}
         <div
           className={`flex flex-1 overflow-hidden md:flex ${
             mobileTab === "strategies" ? "hidden" : "flex"
@@ -247,12 +260,50 @@ const StrategyAgentArea: FC<AgentViewProps> = () => {
         >
           {selectedStrategy ? (
             <>
-              {/* History panel — full-width on mobile, fixed 420px on desktop */}
-              <div className="flex w-full md:w-auto">
-                <StrategyComposeList
-                  composes={composes}
-                  tradingMode={selectedStrategy.trading_mode}
-                />
+              {/* Middle panel — history or chat, full-width on mobile, 420px on desktop */}
+              <div className="flex w-full flex-col overflow-hidden border-border border-r bg-card md:w-[420px]">
+                {/* Tab bar (desktop always shown; mobile only when on history/chat tab) */}
+                <div className="flex shrink-0 items-center justify-between px-6 py-4">
+                  <div className="flex gap-1 rounded-lg bg-muted p-1">
+                    {middleTabs.map((tab) => (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setMiddleTab(tab.key)}
+                        className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                          middleTab === tab.key
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {middleTab === "history" && (
+                    <p className="rounded-md bg-muted px-2.5 py-1 font-medium text-foreground text-sm">
+                      {selectedStrategy.trading_mode === "live"
+                        ? t("strategy.history.live")
+                        : t("strategy.history.virtual")}
+                    </p>
+                  )}
+                </div>
+
+                {/* Panel content */}
+                <div className="flex flex-1 overflow-hidden">
+                  {middleTab === "history" ? (
+                    <StrategyComposeList
+                      composes={composes}
+                      tradingMode={selectedStrategy.trading_mode}
+                      hideHeader
+                    />
+                  ) : (
+                    <StrategyChatPanel
+                      strategyId={selectedStrategy.strategy_id}
+                    />
+                  )}
+                </div>
               </div>
 
               {/* Portfolio panel — desktop only (shown at top on mobile) */}

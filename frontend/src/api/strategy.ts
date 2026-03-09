@@ -194,6 +194,33 @@ export const useDeleteStrategyPrompt = () => {
   });
 };
 
+export const useStrategyChatMutation = () => {
+  return useMutation({
+    mutationFn: (data: {
+      strategy_id: string;
+      message: string;
+      history?: { role: string; content: string }[];
+    }) =>
+      apiClient.post<
+        ApiResponse<{
+          strategy_id: string;
+          explanation: string;
+          prompt_proposal?: string;
+        }>
+      >("/strategies/chat", data),
+  });
+};
+
+export const useUpdateStrategyPromptMutation = () => {
+  return useMutation({
+    mutationFn: (data: { strategy_id: string; prompt_text: string }) =>
+      apiClient.patch<ApiResponse<{ strategy_id: string }>>(
+        "/strategies/update-prompt",
+        data,
+      ),
+  });
+};
+
 export const useStrategyPerformance = (strategyId: number | null) => {
   return useQuery({
     queryKey: API_QUERY_KEYS.STRATEGY.strategyPerformance(

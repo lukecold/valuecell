@@ -213,13 +213,47 @@ const ActionItem: FC<{ action: StrategyAction }> = ({ action }) => {
 interface StrategyComposeListProps {
   composes: StrategyCompose[];
   tradingMode: Strategy["trading_mode"];
+  /** When true, renders only the scrollable content (no outer container or header). */
+  hideHeader?: boolean;
 }
 
 const StrategyComposeList: FC<StrategyComposeListProps> = ({
   composes,
   tradingMode,
+  hideHeader = false,
 }) => {
   const { t } = useTranslation();
+
+  const content = (
+    <div className="scroll-container flex-1 px-6">
+      {composes.length > 0 ? (
+        <div className="flex flex-col gap-4">
+          {composes.map((compose) => (
+            <StrategyComposeItem key={compose.compose_id} compose={compose} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex flex-col items-center gap-4 px-6 py-12 text-center">
+            <div className="flex size-14 items-center justify-center rounded-full bg-muted">
+              <History className="size-7 text-muted-foreground" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <p className="font-semibold text-base text-foreground">
+                {t("strategy.history.empty.title")}
+              </p>
+              <p className="max-w-[280px] text-muted-foreground text-sm leading-relaxed">
+                {t("strategy.history.empty.desc")}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (hideHeader) return content;
+
   return (
     <div className="flex w-full flex-col overflow-hidden border-border border-r bg-card md:w-[420px]">
       <div className="flex items-center justify-between px-6 py-4">
@@ -234,31 +268,7 @@ const StrategyComposeList: FC<StrategyComposeListProps> = ({
         </p>
       </div>
 
-      <div className="scroll-container flex-1 px-6">
-        {composes.length > 0 ? (
-          <div className="flex flex-col gap-4">
-            {composes.map((compose) => (
-              <StrategyComposeItem key={compose.compose_id} compose={compose} />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-1 items-center justify-center">
-            <div className="flex flex-col items-center gap-4 px-6 py-12 text-center">
-              <div className="flex size-14 items-center justify-center rounded-full bg-muted">
-                <History className="size-7 text-muted-foreground" />
-              </div>
-              <div className="flex flex-col gap-2">
-                <p className="font-semibold text-base text-foreground">
-                  {t("strategy.history.empty.title")}
-                </p>
-                <p className="max-w-[280px] text-muted-foreground text-sm leading-relaxed">
-                  {t("strategy.history.empty.desc")}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      {content}
     </div>
   );
 };

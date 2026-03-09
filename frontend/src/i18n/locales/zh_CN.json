@@ -182,7 +182,27 @@
     "tabs": {
       "strategies": "策略",
       "history": "历史",
-      "portfolio": "持仓"
+      "portfolio": "持仓",
+      "chat": "对话"
+    },
+    "chat": {
+      "placeholder": "询问决策或策略...",
+      "empty": "请策略解释其决策或提出改进建议。",
+      "error": "获取响应失败，请重试。",
+      "quick": {
+        "explain": "解释最近的决策",
+        "failures": "最近的交易哪里出了问题？",
+        "improve": "策略如何改进？"
+      },
+      "proposal": {
+        "title": "建议的 Prompt 改进",
+        "accept": "接受",
+        "reject": "忽略",
+        "refine": "优化",
+        "accepted": "Prompt 已更新",
+        "refinePlaceholder": "例如：同时添加移动止损规则...",
+        "submitRefinement": "提交优化"
+      }
     },
     "add": "添加交易策略",
     "noStrategies": "暂无交易策略",
