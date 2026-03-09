@@ -252,9 +252,15 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
         controller.signal.aborted ||
         (err instanceof DOMException && err.name === "AbortError");
       if (!aborted) {
+        const detail =
+          err instanceof Error ? err.message : String(err ?? "unknown error");
+        console.error("[StrategyChat] stream error:", err);
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: t("strategy.chat.error") },
+          {
+            role: "assistant",
+            content: `${t("strategy.chat.error")} (${detail})`,
+          },
         ]);
       }
       setStreamingContent("");

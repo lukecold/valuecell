@@ -351,34 +351,75 @@ def create_strategy_chat_router() -> APIRouter:
             ) from exc
 
         async def event_generator():
-            full_text = ""
+            # Send an immediate ping so the browser knows the connection is live
+            # before the LLM starts generating (which can take 10–20 s).
+            yield ": ping\n\n"
+
+            full_text_parts: list[str] = []
+            error_occurred = False
             extractor = _ExplanationExtractor()
 
+            # Use a queue + background task so we can interleave keepalive SSE
+            # comments while the LLM is silent (no tokens generated yet).
+            queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+            async def _produce() -> None:
+                nonlocal error_occurred
+                try:
+                    async with asyncio.timeout(120.0):
+                        async for event in agent.arun(user_message, stream=True):
+                            chunk: str = ""
+                            if hasattr(event, "content") and isinstance(
+                                event.content, str
+                            ):
+                                chunk = event.content
+                            if not chunk:
+                                continue
+                            full_text_parts.append(chunk)
+                            text_to_send, _ = extractor.feed(chunk)
+                            if text_to_send:
+                                await queue.put(
+                                    _sse({"type": "chunk", "text": text_to_send})
+                                )
+                except asyncio.TimeoutError:
+                    error_occurred = True
+                    await queue.put(
+                        _sse({"type": "error", "message": "LLM timed out after 120 s"})
+                    )
+                except Exception as exc:
+                    error_occurred = True
+                    logger.exception(
+                        "Streaming chat failed for strategy {}", req.strategy_id
+                    )
+                    await queue.put(_sse({"type": "error", "message": str(exc)}))
+                finally:
+                    await queue.put(None)  # sentinel — signals completion
+
+            task = asyncio.create_task(_produce())
+
+            # Drain the queue; send a keepalive comment every 5 s of silence so
+            # idle connections are not dropped by the browser or any proxy.
+            while True:
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+                    continue
+                if item is None:
+                    break
+                yield item
+
+            # Ensure the producer task is fully finished.
             try:
-                async with asyncio.timeout(120.0):
-                    async for event in agent.arun(user_message, stream=True):
-                        chunk: str = ""
-                        if hasattr(event, "content") and isinstance(event.content, str):
-                            chunk = event.content
-                        if not chunk:
-                            continue
+                await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
+            except Exception:
+                pass
 
-                        full_text += chunk
-                        text_to_send, _ = extractor.feed(chunk)
-                        if text_to_send:
-                            yield _sse({"type": "chunk", "text": text_to_send})
-
-            except asyncio.TimeoutError:
-                yield _sse({"type": "error", "message": "LLM timed out after 120 s"})
-                return
-            except Exception as exc:
-                logger.exception(
-                    "Streaming chat failed for strategy {}", req.strategy_id
-                )
-                yield _sse({"type": "error", "message": str(exc)})
+            if error_occurred:
                 return
 
             # Final parsed response
+            full_text = "".join(full_text_parts)
             parsed = _parse_llm_response(full_text)
             explanation = parsed.get("explanation") or full_text
             is_mistake = bool(parsed.get("is_mistake", False))

@@ -223,7 +223,10 @@ export async function streamStrategyChat(
   handlers: ChatStreamHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await fetch(getServerUrl("/strategies/chat"), {
+  const url = getServerUrl("/strategies/chat");
+  console.debug("[StreamChat] connecting to", url);
+
+  const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
@@ -231,18 +234,33 @@ export async function streamStrategyChat(
   });
 
   if (!response.ok || !response.body) {
-    handlers.onError(`HTTP ${response.status}`);
+    console.error(
+      "[StreamChat] bad response:",
+      response.status,
+      response.statusText,
+    );
+    handlers.onError(`HTTP ${response.status}: ${response.statusText}`);
     return;
   }
+
+  console.debug("[StreamChat] response OK, reading stream…");
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let bytesReceived = 0;
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      console.debug(
+        "[StreamChat] stream closed, bytes received:",
+        bytesReceived,
+      );
+      break;
+    }
 
+    bytesReceived += value?.length ?? 0;
     buffer += decoder.decode(value, { stream: true });
 
     // Split on SSE event boundaries (\n\n) while keeping incomplete trailing data
@@ -251,6 +269,8 @@ export async function streamStrategyChat(
 
     for (const part of parts) {
       for (const line of part.split("\n")) {
+        // SSE comments (": ...") are keepalive pings — skip them silently
+        if (line.startsWith(":")) continue;
         if (!line.startsWith("data: ")) continue;
         try {
           const event = JSON.parse(line.slice(6));
@@ -259,10 +279,15 @@ export async function streamStrategyChat(
           } else if (event.type === "done") {
             handlers.onDone(event as ChatStreamDoneEvent);
           } else if (event.type === "error") {
+            console.error("[StreamChat] server error event:", event.message);
             handlers.onError(event.message ?? "Unknown error");
           }
-        } catch {
-          // ignore malformed SSE lines
+        } catch (parseErr) {
+          console.warn(
+            "[StreamChat] failed to parse SSE line:",
+            line,
+            parseErr,
+          );
         }
       }
     }
