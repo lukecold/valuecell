@@ -5,7 +5,7 @@ Strategy API router for handling strategy-related endpoints.
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 

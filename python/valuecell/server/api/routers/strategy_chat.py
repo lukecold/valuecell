@@ -19,7 +19,7 @@ import re
 from typing import Optional
 
 from agno.agent import Agent as AgnoAgent
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from pydantic import BaseModel
 
