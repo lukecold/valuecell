@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { API_QUERY_KEYS } from "@/constants/api";
-import { type ApiResponse, apiClient } from "@/lib/api-client";
+import { type ApiResponse, apiClient, getServerUrl } from "@/lib/api-client";
 import type {
   CreateStrategy,
   PortfolioSummary,
@@ -194,6 +194,80 @@ export const useDeleteStrategyPrompt = () => {
     },
   });
 };
+
+// ---------------------------------------------------------------------------
+// Streaming chat
+// ---------------------------------------------------------------------------
+
+export interface ChatStreamDoneEvent {
+  type: "done";
+  strategy_id: string;
+  explanation: string;
+  prompt_proposal?: string;
+  original_prompt?: string;
+}
+
+export interface ChatStreamHandlers {
+  onChunk: (text: string) => void;
+  onDone: (event: ChatStreamDoneEvent) => void;
+  onError: (message: string) => void;
+}
+
+/** POST /strategies/chat and consume the SSE stream. */
+export async function streamStrategyChat(
+  params: {
+    strategy_id: string;
+    message: string;
+    history?: { role: string; content: string }[];
+  },
+  handlers: ChatStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await fetch(getServerUrl("/strategies/chat"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+    signal,
+  });
+
+  if (!response.ok || !response.body) {
+    handlers.onError(`HTTP ${response.status}`);
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // Split on SSE event boundaries (\n\n) while keeping incomplete trailing data
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() ?? "";
+
+    for (const part of parts) {
+      for (const line of part.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const event = JSON.parse(line.slice(6));
+          if (event.type === "chunk") {
+            handlers.onChunk(event.text ?? "");
+          } else if (event.type === "done") {
+            handlers.onDone(event as ChatStreamDoneEvent);
+          } else if (event.type === "error") {
+            handlers.onError(event.message ?? "Unknown error");
+          }
+        } catch {
+          // ignore malformed SSE lines
+        }
+      }
+    }
+  }
+}
 
 export const useStrategyChatMutation = () => {
   return useMutation({

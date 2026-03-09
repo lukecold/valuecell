@@ -4,8 +4,10 @@ Strategy Chat router — lets users interact with a running strategy's LLM.
 Endpoints
 ---------
 POST /strategies/chat
-    Ask the strategy's model to explain past decisions or suggest improvements.
-    Returns structured response: explanation + optional prompt_proposal.
+    Stream the strategy's LLM response via Server-Sent Events.
+    Emits:  { type: "chunk",  text: "..." }   — explanation text as it arrives
+            { type: "done",   explanation, strategy_id, [prompt_proposal, original_prompt] }
+            { type: "error",  message: "..." }  — on failure
 
 PATCH /strategies/update-prompt
     Apply a prompt improvement to the strategy's stored configuration.
@@ -20,6 +22,7 @@ from typing import Optional
 
 from agno.agent import Agent as AgnoAgent
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel
 
@@ -77,6 +80,105 @@ class StrategyChatRequest(BaseModel):
 class UpdatePromptRequest(BaseModel):
     strategy_id: str
     prompt_text: str
+
+
+# ---------------------------------------------------------------------------
+# Incremental JSON explanation extractor
+# ---------------------------------------------------------------------------
+
+
+class _ExplanationExtractor:
+    """Incrementally extracts the value of the "explanation" key from a
+    streaming JSON string produced by the LLM.
+
+    The LLM outputs something like:
+        {"explanation": "The strategy did X because Y...", "is_mistake": false}
+
+    As JSON chunks arrive token by token we:
+      1. Wait until we see `"explanation":` in the accumulated buffer.
+      2. Find the opening double-quote of the string value.
+      3. Stream each character, unescaping JSON escape sequences.
+      4. Stop when we hit the unescaped closing double-quote.
+
+    If the LLM deviates from JSON format and we never find the key, the
+    caller falls back to sending the whole raw text in the final "done" event.
+    """
+
+    _SEEKING_KEY = 0
+    _SEEKING_OPEN_QUOTE = 1
+    _IN_VALUE = 2
+    _DONE = 3
+    _MARKER = '"explanation":'
+
+    def __init__(self) -> None:
+        self._state = self._SEEKING_KEY
+        self._buf = ""
+        self._escaped = False
+
+    def feed(self, chunk: str) -> tuple[str, bool]:
+        """Process *chunk* and return (text_to_stream, extraction_complete)."""
+        if self._state == self._DONE:
+            return "", True
+
+        self._buf += chunk
+
+        if self._state == self._SEEKING_KEY:
+            pos = self._buf.find(self._MARKER)
+            if pos != -1:
+                self._buf = self._buf[pos + len(self._MARKER) :]
+                self._state = self._SEEKING_OPEN_QUOTE
+            else:
+                # Keep tail in case the marker spans chunks
+                keep = len(self._MARKER) - 1
+                self._buf = self._buf[-keep:] if len(self._buf) > keep else self._buf
+                return "", False
+
+        if self._state == self._SEEKING_OPEN_QUOTE:
+            pos = self._buf.find('"')
+            if pos != -1:
+                self._buf = self._buf[pos + 1 :]
+                self._state = self._IN_VALUE
+            else:
+                return "", False
+
+        if self._state == self._IN_VALUE:
+            result: list[str] = []
+            i = 0
+            while i < len(self._buf):
+                c = self._buf[i]
+                if self._escaped:
+                    _ESCAPES = {
+                        "n": "\n",
+                        "t": "\t",
+                        "r": "\r",
+                        '"': '"',
+                        "\\": "\\",
+                        "/": "/",
+                    }
+                    result.append(_ESCAPES.get(c, c))
+                    self._escaped = False
+                    i += 1
+                elif c == "\\":
+                    self._escaped = True
+                    i += 1
+                elif c == '"':
+                    # Closing quote — extraction done
+                    self._state = self._DONE
+                    self._buf = self._buf[i + 1 :]
+                    return "".join(result), True
+                else:
+                    result.append(c)
+                    i += 1
+
+            self._buf = ""
+            return "".join(result), False
+
+        return "", False
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 
 def _parse_llm_response(raw: str) -> dict:
@@ -184,17 +286,29 @@ def _build_context(strategy, req: StrategyChatRequest, repo) -> str:
     return f"{context}{history_text}\n\n## User Question\n{req.message}"
 
 
+def _sse(payload: dict) -> str:
+    """Format a dict as a single SSE data line."""
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+# ---------------------------------------------------------------------------
+# Router
+# ---------------------------------------------------------------------------
+
+
 def create_strategy_chat_router() -> APIRouter:
     router = APIRouter(prefix="/strategies", tags=["strategies"])
 
     @router.post("/chat")
     async def strategy_chat(req: StrategyChatRequest):
         """
-        Send a message to the strategy's LLM.
+        Stream the strategy LLM response via Server-Sent Events.
 
-        Returns:
-          - explanation: answer grounded in strategy data
-          - prompt_proposal: full revised prompt (only when a correctable mistake is found)
+        Event types emitted:
+          { "type": "chunk",  "text": "..." }
+          { "type": "done",   "strategy_id": ..., "explanation": ...,
+                              ["prompt_proposal": ..., "original_prompt": ...] }
+          { "type": "error",  "message": "..." }
         """
         repo = get_strategy_repository()
         strategy = repo.get_strategy_by_strategy_id(req.strategy_id)
@@ -213,7 +327,6 @@ def create_strategy_chat_router() -> APIRouter:
                 detail="Strategy LLM config is not available in the database",
             )
 
-        # Extract the current prompt text so we can include it in the diff on the FE
         tc: dict = cfg.get("trading_config") or {}
         current_prompt_text: str = (
             tc.get("prompt_text") or tc.get("custom_prompt") or ""
@@ -232,35 +345,64 @@ def create_strategy_chat_router() -> APIRouter:
                 instructions=[_CHAT_SYSTEM_PROMPT],
                 markdown=False,
             )
-            response = await asyncio.wait_for(agent.arun(user_message), timeout=120.0)
-            raw = getattr(response, "content", None) or response
-            if not isinstance(raw, str):
-                raw = str(raw)
-        except asyncio.TimeoutError:
-            raise HTTPException(
-                status_code=504, detail="LLM call timed out after 120 seconds"
-            )
         except Exception as exc:
-            logger.exception("Chat LLM call failed for strategy {}", req.strategy_id)
             raise HTTPException(
-                status_code=500, detail=f"LLM call failed: {exc}"
+                status_code=500, detail=f"Failed to create model: {exc}"
             ) from exc
 
-        parsed = _parse_llm_response(raw)
-        explanation = parsed.get("explanation") or raw
-        is_mistake = bool(parsed.get("is_mistake", False))
-        prompt_proposal = parsed.get("prompt_proposal") if is_mistake else None
+        async def event_generator():
+            full_text = ""
+            extractor = _ExplanationExtractor()
 
-        result: dict = {
-            "strategy_id": req.strategy_id,
-            "explanation": explanation,
-        }
-        if prompt_proposal:
-            result["prompt_proposal"] = prompt_proposal
-            # Include the original so the frontend can render a diff
-            result["original_prompt"] = current_prompt_text
+            try:
+                async with asyncio.timeout(120.0):
+                    async for event in agent.arun(user_message, stream=True):
+                        chunk: str = ""
+                        if hasattr(event, "content") and isinstance(event.content, str):
+                            chunk = event.content
+                        if not chunk:
+                            continue
 
-        return SuccessResponse.create(data=result, msg="Chat response generated")
+                        full_text += chunk
+                        text_to_send, _ = extractor.feed(chunk)
+                        if text_to_send:
+                            yield _sse({"type": "chunk", "text": text_to_send})
+
+            except asyncio.TimeoutError:
+                yield _sse({"type": "error", "message": "LLM timed out after 120 s"})
+                return
+            except Exception as exc:
+                logger.exception(
+                    "Streaming chat failed for strategy {}", req.strategy_id
+                )
+                yield _sse({"type": "error", "message": str(exc)})
+                return
+
+            # Final parsed response
+            parsed = _parse_llm_response(full_text)
+            explanation = parsed.get("explanation") or full_text
+            is_mistake = bool(parsed.get("is_mistake", False))
+            prompt_proposal = parsed.get("prompt_proposal") if is_mistake else None
+
+            done: dict = {
+                "type": "done",
+                "strategy_id": req.strategy_id,
+                "explanation": explanation,
+            }
+            if prompt_proposal:
+                done["prompt_proposal"] = prompt_proposal
+                done["original_prompt"] = current_prompt_text
+
+            yield _sse(done)
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     @router.patch("/update-prompt")
     async def update_strategy_prompt(
