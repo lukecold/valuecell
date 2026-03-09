@@ -712,7 +712,6 @@ class StrategyRepository:
             if not self.db_session:
                 session.close()
 
-
     def update_metadata_only(self, strategy_id: str, metadata: dict) -> bool:
         """Update strategy_metadata via a direct UPDATE — no prior SELECT required.
 

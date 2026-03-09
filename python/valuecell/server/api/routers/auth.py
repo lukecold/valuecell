@@ -1,4 +1,5 @@
 """Auth router — email magic link authentication."""
+
 from __future__ import annotations
 
 import os

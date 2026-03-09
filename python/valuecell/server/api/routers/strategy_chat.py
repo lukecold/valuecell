@@ -159,9 +159,7 @@ def _build_context(strategy, req: StrategyChatRequest, repo) -> str:
         lines = []
         for d in reversed(details):
             ts = d.entry_time.strftime("%Y-%m-%d %H:%M") if d.entry_time else "?"
-            exit_ts = (
-                d.exit_time.strftime("%Y-%m-%d %H:%M") if d.exit_time else "open"
-            )
+            exit_ts = d.exit_time.strftime("%Y-%m-%d %H:%M") if d.exit_time else "open"
             lines.append(
                 f"  - {ts}→{exit_ts} | {d.symbol} {d.type} {d.side} "
                 f"qty={d.quantity} entry={d.entry_price} exit={d.exit_price} "
@@ -234,9 +232,7 @@ def create_strategy_chat_router() -> APIRouter:
                 instructions=[_CHAT_SYSTEM_PROMPT],
                 markdown=False,
             )
-            response = await asyncio.wait_for(
-                agent.arun(user_message), timeout=120.0
-            )
+            response = await asyncio.wait_for(agent.arun(user_message), timeout=120.0)
             raw = getattr(response, "content", None) or response
             if not isinstance(raw, str):
                 raw = str(raw)
@@ -245,9 +241,7 @@ def create_strategy_chat_router() -> APIRouter:
                 status_code=504, detail="LLM call timed out after 120 seconds"
             )
         except Exception as exc:
-            logger.exception(
-                "Chat LLM call failed for strategy {}", req.strategy_id
-            )
+            logger.exception("Chat LLM call failed for strategy {}", req.strategy_id)
             raise HTTPException(
                 status_code=500, detail=f"LLM call failed: {exc}"
             ) from exc

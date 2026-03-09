@@ -123,7 +123,9 @@ class StreamController:
             # Use slow path (no cache yet) for the very first write so we don't
             # overwrite any metadata that was set before this cycle started
             # (e.g., by auto-resume logic).
-            ok = strategy_persistence.persist_strategy_summary(initial_summary, existing_meta=None)
+            ok = strategy_persistence.persist_strategy_summary(
+                initial_summary, existing_meta=None
+            )
             if ok:
                 logger.info(
                     "Persisted initial strategy summary for strategy={}",

@@ -168,11 +168,19 @@ def persist_portfolio_view(view: agent_models.PortfolioView) -> bool:
                 {
                     "symbol": symbol,
                     "type": ttype,
-                    "leverage": float(pos.leverage) if pos.leverage is not None else None,
-                    "entry_price": float(pos.avg_price) if pos.avg_price is not None else None,
+                    "leverage": float(pos.leverage)
+                    if pos.leverage is not None
+                    else None,
+                    "entry_price": float(pos.avg_price)
+                    if pos.avg_price is not None
+                    else None,
                     "quantity": abs(float(pos.quantity)),
-                    "unrealized_pnl": float(pos.unrealized_pnl) if pos.unrealized_pnl is not None else None,
-                    "unrealized_pnl_pct": float(pos.unrealized_pnl_pct) if pos.unrealized_pnl_pct is not None else None,
+                    "unrealized_pnl": float(pos.unrealized_pnl)
+                    if pos.unrealized_pnl is not None
+                    else None,
+                    "unrealized_pnl_pct": float(pos.unrealized_pnl_pct)
+                    if pos.unrealized_pnl_pct is not None
+                    else None,
                 }
             )
 

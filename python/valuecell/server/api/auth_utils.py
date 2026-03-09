@@ -1,4 +1,5 @@
 """Auth utilities: HMAC-based token creation/verification and FastAPI dependencies."""
+
 from __future__ import annotations
 
 import base64

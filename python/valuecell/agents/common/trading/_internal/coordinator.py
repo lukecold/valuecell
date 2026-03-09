@@ -126,7 +126,9 @@ class DefaultDecisionCoordinator(DecisionCoordinator):
                     # double-counting unrealized PnL.
                     # We initially set a conservative estimate using free_cash (availableBalance);
                     # it will be corrected to walletBalance once positions are fetched below.
-                    portfolio.account_balance = float(free_cash)  # initial estimate (availableBalance)
+                    portfolio.account_balance = float(
+                        free_cash
+                    )  # initial estimate (availableBalance)
                     # Buying Power is explicit Free Margin
                     portfolio.buying_power = float(free_cash)
                     # Also update free_cash field in view if it exists
@@ -155,7 +157,9 @@ class DefaultDecisionCoordinator(DecisionCoordinator):
                         #   equity = marginBalance + unrealizedPnl  (unrealized PnL counted twice!)
                         wallet_balance = total_cash - total_unrealized_pnl
                         portfolio.account_balance = float(max(0.0, wallet_balance))
-                        portfolio.total_value = float(total_cash)  # marginBalance = correct equity
+                        portfolio.total_value = float(
+                            total_cash
+                        )  # marginBalance = correct equity
         except Exception:
             # If syncing fails, continue with existing portfolio view
             logger.warning(
