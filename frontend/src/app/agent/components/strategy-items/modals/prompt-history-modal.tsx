@@ -9,11 +9,9 @@ import {
 import { useTranslation } from "react-i18next";
 import { useGetPromptHistory } from "@/api/strategy";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { TIME_FORMATS, TimeUtils } from "@/lib/time";
@@ -64,7 +62,7 @@ function computeLineDiff(original: string, proposed: string): DiffLine[] {
 }
 
 // ---------------------------------------------------------------------------
-// Row types for each view mode
+// Row types
 // ---------------------------------------------------------------------------
 
 interface InlineRow {
@@ -114,7 +112,6 @@ function toSideBySideRows(diff: DiffLine[]): SideBySideRow[] {
       rightNo++;
       i++;
     } else {
-      // Collect a hunk of removed/added lines
       const removed: string[] = [];
       const added: string[] = [];
       while (i < diff.length && diff[i].type !== "unchanged") {
@@ -178,14 +175,10 @@ const InlineView: FC<{ rows: InlineRow[] }> = ({ rows }) => (
         <div key={idx} className={`flex min-w-0 items-start py-px ${bg}`}>
           <LineNo n={row.leftNo} />
           <LineNo n={row.rightNo} />
-          <span
-            className={`w-4 shrink-0 select-none text-center font-bold ${fg}`}
-          >
+          <span className={`w-4 shrink-0 select-none text-center font-bold ${fg}`}>
             {prefix}
           </span>
-          <span
-            className={`min-w-0 flex-1 whitespace-pre-wrap break-all pl-2 ${fg}`}
-          >
+          <span className={`min-w-0 flex-1 whitespace-pre-wrap break-all pl-2 ${fg}`}>
             {row.text || "\u00A0"}
           </span>
         </div>
@@ -201,84 +194,32 @@ const InlineView: FC<{ rows: InlineRow[] }> = ({ rows }) => (
 const SplitView: FC<{ rows: SideBySideRow[] }> = ({ rows }) => (
   <div className="w-full font-mono text-xs leading-5">
     {rows.map((row, idx) => {
-      const leftBg =
-        row.left?.type === "removed" ? "bg-red-500/10" : "";
-      const rightBg =
-        row.right?.type === "added" ? "bg-green-500/10" : "";
-      const leftFg =
-        row.left?.type === "removed"
-          ? "text-red-700 dark:text-red-400"
-          : "text-foreground/80";
-      const rightFg =
-        row.right?.type === "added"
-          ? "text-green-700 dark:text-green-400"
-          : "text-foreground/80";
-
+      const leftBg = row.left?.type === "removed" ? "bg-red-500/10" : "";
+      const rightBg = row.right?.type === "added" ? "bg-green-500/10" : "";
       return (
         // biome-ignore lint/suspicious/noArrayIndexKey: stable diff output
         <div key={idx} className="flex min-w-0 items-stretch">
-          {/* Left (A) */}
-          <div
-            className={`flex min-w-0 flex-1 items-start border-r border-border py-px ${leftBg}`}
-          >
+          <div className={`flex min-w-0 flex-1 items-start border-r border-border py-px ${leftBg}`}>
             <LineNo n={row.left?.lineNo} />
-            <span
-              className={`w-4 shrink-0 select-none text-center font-bold ${row.left?.type === "removed" ? "text-red-700 dark:text-red-400" : ""}`}
-            >
+            <span className={`w-4 shrink-0 select-none text-center font-bold ${row.left?.type === "removed" ? "text-red-700 dark:text-red-400" : ""}`}>
               {row.left?.type === "removed" ? "−" : " "}
             </span>
-            <span
-              className={`min-w-0 flex-1 whitespace-pre-wrap break-all pl-2 ${leftFg}`}
-            >
+            <span className={`min-w-0 flex-1 whitespace-pre-wrap break-all pl-2 ${row.left?.type === "removed" ? "text-red-700 dark:text-red-400" : "text-foreground/80"}`}>
               {row.left !== undefined ? row.left.text || "\u00A0" : "\u00A0"}
             </span>
           </div>
-          {/* Right (B) */}
-          <div
-            className={`flex min-w-0 flex-1 items-start py-px ${rightBg}`}
-          >
+          <div className={`flex min-w-0 flex-1 items-start py-px ${rightBg}`}>
             <LineNo n={row.right?.lineNo} />
-            <span
-              className={`w-4 shrink-0 select-none text-center font-bold ${row.right?.type === "added" ? "text-green-700 dark:text-green-400" : ""}`}
-            >
+            <span className={`w-4 shrink-0 select-none text-center font-bold ${row.right?.type === "added" ? "text-green-700 dark:text-green-400" : ""}`}>
               {row.right?.type === "added" ? "+" : " "}
             </span>
-            <span
-              className={`min-w-0 flex-1 whitespace-pre-wrap break-all pl-2 ${rightFg}`}
-            >
+            <span className={`min-w-0 flex-1 whitespace-pre-wrap break-all pl-2 ${row.right?.type === "added" ? "text-green-700 dark:text-green-400" : "text-foreground/80"}`}>
               {row.right !== undefined ? row.right.text || "\u00A0" : "\u00A0"}
             </span>
           </div>
         </div>
       );
     })}
-  </div>
-);
-
-// ---------------------------------------------------------------------------
-// Resize handle
-// ---------------------------------------------------------------------------
-
-const ResizeHandle: FC<{
-  onMouseDown: (e: React.MouseEvent) => void;
-}> = ({ onMouseDown }) => (
-  <div
-    onMouseDown={onMouseDown}
-    className="absolute bottom-0 right-0 z-20 cursor-nwse-resize p-1 opacity-30 transition-opacity hover:opacity-80"
-    style={{ userSelect: "none" }}
-    title="Drag to resize"
-  >
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 12 12"
-      fill="currentColor"
-      className="text-muted-foreground"
-    >
-      <rect x="6" y="10" width="2" height="2" rx="0.5" />
-      <rect x="10" y="10" width="2" height="2" rx="0.5" />
-      <rect x="10" y="6" width="2" height="2" rx="0.5" />
-    </svg>
   </div>
 );
 
@@ -295,39 +236,69 @@ interface PromptHistoryModalProps {
 }
 
 // ---------------------------------------------------------------------------
-// Main component
+// Constants
 // ---------------------------------------------------------------------------
 
 type ViewMode = "inline" | "split";
-
 const DEFAULT_W = 920;
-const DEFAULT_H = 620;
+const DEFAULT_H = 600;
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 const PromptHistoryModal: FC<PromptHistoryModalProps> = ({ ref }) => {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [strategyId, setStrategyId] = useState<string | number | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("split");
-  const [size, setSize] = useState({ width: DEFAULT_W, height: DEFAULT_H });
-  const sizeRef = useRef(size);
 
-  // A/B selection: 0-based index into newest-first versions array
-  const [selA, setSelA] = useState<number>(1); // second-latest = "before"
-  const [selB, setSelB] = useState<number>(0); // latest = "after"
+  // Window size (drag-to-resize)
+  const [size, setSize] = useState({ width: DEFAULT_W, height: DEFAULT_H });
+  const sizeRef = useRef({ width: DEFAULT_W, height: DEFAULT_H });
+
+  // Window position — null = use default CSS centering, otherwise px from viewport TL
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const posRef = useRef<{ top: number; left: number } | null>(null);
+
+  // A/B selection (0-based, newest-first)
+  const [selA, setSelA] = useState<number>(1);
+  const [selB, setSelB] = useState<number>(0);
+
+  // ── Open / close ──────────────────────────────────────────────────────────
 
   useImperativeHandle(ref, () => ({
     open: (id) => {
       setStrategyId(id);
+      // Center the window in the viewport on each open
+      const w = Math.min(sizeRef.current.width, window.innerWidth * 0.96);
+      const h = Math.min(sizeRef.current.height, window.innerHeight * 0.96);
+      const initial = {
+        top: Math.max(0, (window.innerHeight - h) / 2),
+        left: Math.max(0, (window.innerWidth - w) / 2),
+      };
+      posRef.current = initial;
+      setPos(initial);
       setIsOpen(true);
     },
   }));
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      setStrategyId(null);
+      setSelA(1);
+      setSelB(0);
+    }
+  };
+
+  // ── Data ──────────────────────────────────────────────────────────────────
 
   const { data: versionsRaw = [], isLoading } = useGetPromptHistory(
     strategyId ?? undefined,
     isOpen,
   );
 
-  // Display newest-first
   const versions = useMemo(() => [...versionsRaw].reverse(), [versionsRaw]);
 
   const versionCount = versions.length;
@@ -339,7 +310,6 @@ const PromptHistoryModal: FC<PromptHistoryModalProps> = ({ ref }) => {
   const versionA = versions[effectiveSelA];
   const versionB = versions[effectiveSelB];
 
-  // Diff computation
   const diff = useMemo(
     () =>
       versionA && versionB && effectiveSelA !== effectiveSelB
@@ -347,33 +317,58 @@ const PromptHistoryModal: FC<PromptHistoryModalProps> = ({ ref }) => {
         : null,
     [versionA, versionB, effectiveSelA, effectiveSelB],
   );
+  const inlineRows = useMemo(() => (diff ? toInlineRows(diff) : null), [diff]);
+  const splitRows = useMemo(() => (diff ? toSideBySideRows(diff) : null), [diff]);
 
-  const inlineRows = useMemo(
-    () => (diff ? toInlineRows(diff) : null),
-    [diff],
-  );
-  const splitRows = useMemo(
-    () => (diff ? toSideBySideRows(diff) : null),
-    [diff],
-  );
+  // ── Drag-to-move (header) ─────────────────────────────────────────────────
 
-  // Drag-to-resize
-  const handleResizeStart = (e: React.MouseEvent) => {
+  const handleHeaderMouseDown = (e: React.MouseEvent) => {
+    // Ignore clicks on interactive children (buttons, etc.)
+    if ((e.target as HTMLElement).closest("button, [role='button']")) return;
     e.preventDefault();
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startTop = posRef.current?.top ?? 0;
+    const startLeft = posRef.current?.left ?? 0;
+
+    const onMove = (ev: MouseEvent) => {
+      const w = sizeRef.current.width;
+      const h = sizeRef.current.height;
+      const newTop = Math.max(
+        0,
+        Math.min(window.innerHeight - 40, startTop + ev.clientY - startY),
+      );
+      const newLeft = Math.max(
+        -w + 80,
+        Math.min(window.innerWidth - 80, startLeft + ev.clientX - startX),
+      );
+      const next = { top: newTop, left: newLeft };
+      posRef.current = next;
+      setPos(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  // ── Drag-to-resize (corner handle) ───────────────────────────────────────
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation(); // don't trigger header drag
+
     const startX = e.clientX;
     const startY = e.clientY;
     const startW = sizeRef.current.width;
     const startH = sizeRef.current.height;
 
     const onMove = (ev: MouseEvent) => {
-      const w = Math.max(
-        520,
-        Math.min(window.innerWidth * 0.96, startW + ev.clientX - startX),
-      );
-      const h = Math.max(
-        380,
-        Math.min(window.innerHeight * 0.96, startH + ev.clientY - startY),
-      );
+      const w = Math.max(520, Math.min(window.innerWidth * 0.96, startW + ev.clientX - startX));
+      const h = Math.max(380, Math.min(window.innerHeight * 0.96, startH + ev.clientY - startY));
       sizeRef.current = { width: w, height: h };
       setSize({ width: w, height: h });
     };
@@ -385,37 +380,50 @@ const PromptHistoryModal: FC<PromptHistoryModalProps> = ({ ref }) => {
     window.addEventListener("mouseup", onUp);
   };
 
-  const handleOpenChange = (open: boolean) => {
-    setIsOpen(open);
-    if (!open) {
-      setStrategyId(null);
-      setSelA(1);
-      setSelB(0);
-    }
-  };
+  // ── Helper ────────────────────────────────────────────────────────────────
 
-  // Helper: display version number (1 = oldest, N = newest)
   const displayVer = (idx: number) => versionsRaw.length - idx;
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
-        style={{
-          width: size.width,
-          height: size.height,
-          maxWidth: "96vw",
-          maxHeight: "96vh",
-        }}
-        className="relative flex flex-col gap-0 overflow-hidden p-0"
+        // IMPORTANT: do NOT add `relative` here — it overrides the built-in
+        // `fixed` positioning and breaks centering. Use no positioning class.
+        className="flex flex-col gap-0 overflow-hidden p-0"
+        style={
+          pos
+            ? {
+                // Override the default top-[50%] left-[50%] translate(-50%,-50%)
+                // with absolute pixel coordinates so we can drag the window.
+                top: pos.top,
+                left: pos.left,
+                transform: "none",
+                width: size.width,
+                height: size.height,
+                maxWidth: "96vw",
+                maxHeight: "96vh",
+              }
+            : {
+                width: size.width,
+                height: size.height,
+                maxWidth: "96vw",
+                maxHeight: "96vh",
+              }
+        }
       >
-        {/* ── Header ───────────────────────────────────────────────── */}
-        <DialogHeader className="flex shrink-0 flex-row items-center justify-between border-b px-5 py-3">
+        {/* ── Header (drag handle + title + view toggle) ─────────────── */}
+        <div
+          onMouseDown={handleHeaderMouseDown}
+          className="flex shrink-0 cursor-move select-none items-center justify-between border-b px-5 py-3"
+        >
           <DialogTitle className="text-sm font-semibold">
             {t("strategy.promptHistory.title")}
           </DialogTitle>
 
           {/* Inline / Split toggle */}
-          <div className="mr-6 flex items-center overflow-hidden rounded-md border border-border text-xs">
+          <div className="mr-6 flex overflow-hidden rounded-md border border-border text-xs">
             <button
               type="button"
               onClick={() => setViewMode("inline")}
@@ -439,9 +447,9 @@ const PromptHistoryModal: FC<PromptHistoryModalProps> = ({ ref }) => {
               {t("strategy.promptHistory.splitView")}
             </button>
           </div>
-        </DialogHeader>
+        </div>
 
-        {/* ── Body ─────────────────────────────────────────────────── */}
+        {/* ── Body ───────────────────────────────────────────────────── */}
         {isLoading ? (
           <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
             {t("strategy.promptHistory.loading")}
@@ -454,7 +462,7 @@ const PromptHistoryModal: FC<PromptHistoryModalProps> = ({ ref }) => {
           </div>
         ) : (
           <div className="flex min-h-0 flex-1 overflow-hidden">
-            {/* ── Left: version list ─────────────────────────────── */}
+            {/* Left: version list */}
             <div className="flex w-52 shrink-0 flex-col overflow-y-auto border-r">
               <div className="shrink-0 border-b bg-muted/30 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {t("strategy.promptHistory.versions")}
@@ -470,7 +478,6 @@ const PromptHistoryModal: FC<PromptHistoryModalProps> = ({ ref }) => {
                       isA || isB ? "bg-muted/50" : "hover:bg-muted/20"
                     }`}
                   >
-                    {/* Row 1: version label + A/B buttons */}
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-xs font-semibold text-foreground">
                         v{displayVer(idx)}
@@ -506,14 +513,12 @@ const PromptHistoryModal: FC<PromptHistoryModalProps> = ({ ref }) => {
                       </div>
                     </div>
 
-                    {/* Row 2: timestamp */}
                     {v.saved_at && (
                       <span className="text-[10px] text-muted-foreground">
                         {TimeUtils.formatUTC(v.saved_at, TIME_FORMATS.DATETIME)}
                       </span>
                     )}
 
-                    {/* Row 3: prompt preview */}
                     <p className="line-clamp-2 font-mono text-[10px] leading-relaxed text-muted-foreground">
                       {v.prompt_text || "—"}
                     </p>
@@ -522,7 +527,7 @@ const PromptHistoryModal: FC<PromptHistoryModalProps> = ({ ref }) => {
               })}
             </div>
 
-            {/* ── Right: diff area ───────────────────────────────── */}
+            {/* Right: diff area */}
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               {/* Sub-header: A→B badges */}
               <div className="flex shrink-0 items-center gap-2 border-b bg-muted/20 px-4 py-2 text-xs">
@@ -531,7 +536,7 @@ const PromptHistoryModal: FC<PromptHistoryModalProps> = ({ ref }) => {
                     variant="outline"
                     className="border-blue-400 font-mono text-blue-600 dark:text-blue-400"
                   >
-                    A&nbsp;v{displayVer(effectiveSelA)}
+                    A v{displayVer(effectiveSelA)}
                     {versionA.is_current &&
                       ` · ${t("strategy.promptHistory.current")}`}
                   </Badge>
@@ -542,21 +547,15 @@ const PromptHistoryModal: FC<PromptHistoryModalProps> = ({ ref }) => {
                     variant="outline"
                     className="border-green-400 font-mono text-green-600 dark:text-green-400"
                   >
-                    B&nbsp;v{displayVer(effectiveSelB)}
+                    B v{displayVer(effectiveSelB)}
                     {versionB.is_current &&
                       ` · ${t("strategy.promptHistory.current")}`}
                   </Badge>
                 )}
-
-                {/* Split view column headers */}
                 {viewMode === "split" && diff && (
                   <div className="ml-auto flex flex-1 justify-around text-[10px] font-medium text-muted-foreground/60">
-                    <span className="flex-1 pl-10 text-blue-500/70">
-                      A (old)
-                    </span>
-                    <span className="flex-1 pl-10 text-green-500/70">
-                      B (new)
-                    </span>
+                    <span className="flex-1 pl-10 text-blue-500/70">A (old)</span>
+                    <span className="flex-1 pl-10 text-green-500/70">B (new)</span>
                   </div>
                 )}
               </div>
@@ -570,41 +569,48 @@ const PromptHistoryModal: FC<PromptHistoryModalProps> = ({ ref }) => {
                     </p>
                   </div>
                 ) : effectiveSelA === effectiveSelB ? (
-                  /* Same version selected — show plain content */
                   <div className="font-mono text-xs leading-5">
-                    {(versionA?.prompt_text || "").split("\n").map(
-                      (line, idx) => (
-                        // biome-ignore lint/suspicious/noArrayIndexKey: stable
-                        <div
-                          key={idx}
-                          className="flex min-w-0 items-start py-px"
-                        >
-                          <LineNo n={idx + 1} />
-                          <LineNo />
-                          <span className="w-4 shrink-0 select-none text-center text-muted-foreground/40">
-                            {" "}
-                          </span>
-                          <span className="min-w-0 flex-1 whitespace-pre-wrap break-all pl-2 text-foreground/80">
-                            {line || "\u00A0"}
-                          </span>
-                        </div>
-                      ),
-                    )}
+                    {(versionA?.prompt_text || "").split("\n").map((line, idx) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: stable
+                      <div key={idx} className="flex min-w-0 items-start py-px">
+                        <LineNo n={idx + 1} />
+                        <LineNo />
+                        <span className="w-4 shrink-0 select-none text-center text-muted-foreground/40"> </span>
+                        <span className="min-w-0 flex-1 whitespace-pre-wrap break-all pl-2 text-foreground/80">
+                          {line || "\u00A0"}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                ) : diff ? (
-                  viewMode === "inline" ? (
-                    <InlineView rows={inlineRows!} />
-                  ) : (
-                    <SplitView rows={splitRows!} />
-                  )
-                ) : null}
+                ) : viewMode === "inline" ? (
+                  <InlineView rows={inlineRows!} />
+                ) : (
+                  <SplitView rows={splitRows!} />
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* ── Resize handle ─────────────────────────────────────────── */}
-        <ResizeHandle onMouseDown={handleResizeStart} />
+        {/* ── Resize handle (bottom-right corner) ──────────────────── */}
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute bottom-0 right-0 z-20 cursor-nwse-resize p-1.5 opacity-30 transition-opacity hover:opacity-80"
+          style={{ userSelect: "none" }}
+          title="Drag to resize"
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="currentColor"
+            className="text-muted-foreground"
+          >
+            <rect x="6" y="10" width="2" height="2" rx="0.5" />
+            <rect x="10" y="10" width="2" height="2" rx="0.5" />
+            <rect x="10" y="6" width="2" height="2" rx="0.5" />
+          </svg>
+        </div>
       </DialogContent>
     </Dialog>
   );
