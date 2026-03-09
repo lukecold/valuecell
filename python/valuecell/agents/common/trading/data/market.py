@@ -1,6 +1,5 @@
 import asyncio
 import itertools
-from collections import defaultdict
 from typing import List, Optional
 
 from loguru import logger
