@@ -230,6 +230,35 @@ class DatabaseInitializer:
                     """)
                 )
 
+                # Create auth tables
+                conn.execute(
+                    text("""
+                    CREATE TABLE IF NOT EXISTS auth_users (
+                        id TEXT PRIMARY KEY,
+                        email TEXT UNIQUE NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """)
+                )
+                conn.execute(
+                    text("""
+                    CREATE TABLE IF NOT EXISTS auth_magic_links (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        email TEXT NOT NULL,
+                        token TEXT UNIQUE NOT NULL,
+                        expires_at TIMESTAMP NOT NULL,
+                        used BOOLEAN NOT NULL DEFAULT false,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """)
+                )
+                conn.execute(
+                    text("""
+                    CREATE INDEX IF NOT EXISTS idx_auth_magic_links_token
+                    ON auth_magic_links(token)
+                    """)
+                )
+
                 conn.commit()
 
             logger.info("Database tables created successfully")

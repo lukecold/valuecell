@@ -54,6 +54,7 @@ const queryClient = new QueryClient({
 
 import { AutoUpdateCheck } from "@/components/valuecell/app/auto-update-check";
 import { BackendHealthCheck } from "@/components/valuecell/app/backend-health-check";
+import { AuthGateProvider } from "@/components/valuecell/auth/auth-gate-modal";
 import { TrackerProvider } from "./provider/tracker-provider";
 
 export default function Root() {
@@ -67,6 +68,7 @@ export default function Root() {
         storageKey="valuecell-theme"
       >
         <BackendHealthCheck>
+          <AuthGateProvider>
           <TrackerProvider>
             <SidebarProvider>
               <div className="fixed flex size-full overflow-hidden">
@@ -82,6 +84,7 @@ export default function Root() {
               </div>
             </SidebarProvider>
           </TrackerProvider>
+          </AuthGateProvider>
           <AutoUpdateCheck />
         </BackendHealthCheck>
       </ThemeProvider>

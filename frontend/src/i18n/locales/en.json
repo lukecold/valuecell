@@ -59,6 +59,35 @@
           "description": "Info: {{info}}"
         }
       }
+    },
+    "magicLink": {
+      "title": "Sign In",
+      "desc": "Enter your email and we'll send you a magic link to sign in.",
+      "emailPlaceholder": "you@example.com",
+      "sendLink": "Send Magic Link",
+      "sending": "Sending...",
+      "checkEmail": "Check your email",
+      "sentDesc": "We sent a sign-in link to {{email}}. Click the link in the email to sign in.",
+      "resend": "Send another link",
+      "invalidEmail": "Please enter a valid email address",
+      "sendFailed": "Failed to send magic link. Please try again."
+    },
+    "verify": {
+      "verifying": "Verifying your link...",
+      "noToken": "Invalid verification link.",
+      "success": "Welcome, {{name}}!",
+      "failed": "This link is invalid or has expired. Please request a new one."
+    },
+    "gate": {
+      "title": "Sign in required",
+      "desc": "You need to be signed in to perform this action.",
+      "signIn": "Sign In",
+      "cancel": "Cancel",
+      "notOwner": "You don't have permission to modify this strategy."
+    },
+    "profile": {
+      "title": "My Account",
+      "signOut": "Sign Out"
     }
   },
   "settings": {

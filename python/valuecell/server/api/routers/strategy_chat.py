@@ -19,10 +19,14 @@ import re
 from typing import Optional
 
 from agno.agent import Agent as AgnoAgent
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from loguru import logger
 from pydantic import BaseModel
 
+from valuecell.server.api.auth_utils import (
+    check_strategy_ownership,
+    get_current_user_optional,
+)
 from valuecell.server.api.schemas.base import SuccessResponse
 from valuecell.server.db.repositories import get_strategy_repository
 from valuecell.utils.model import create_model_with_provider
@@ -265,7 +269,10 @@ def create_strategy_chat_router() -> APIRouter:
         return SuccessResponse.create(data=result, msg="Chat response generated")
 
     @router.patch("/update-prompt")
-    async def update_strategy_prompt(req: UpdatePromptRequest):
+    async def update_strategy_prompt(
+        req: UpdatePromptRequest,
+        current_user: Optional[str] = Depends(get_current_user_optional),
+    ):
         """
         Apply a prompt improvement to the strategy's stored configuration.
         The old prompt is saved to strategy_metadata.prompt_history before overwriting.
@@ -275,6 +282,9 @@ def create_strategy_chat_router() -> APIRouter:
         strategy = repo.get_strategy_by_strategy_id(req.strategy_id)
         if not strategy:
             raise HTTPException(status_code=404, detail="Strategy not found")
+
+        # Ownership check
+        check_strategy_ownership(strategy, current_user)
 
         from datetime import datetime, timezone
 

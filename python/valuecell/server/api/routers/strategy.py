@@ -5,11 +5,15 @@ Strategy API router for handling strategy-related endpoints.
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from valuecell.agents.common.trading.models import StopReason
+from valuecell.server.api.auth_utils import (
+    check_strategy_ownership,
+    get_current_user_optional,
+)
 from valuecell.server.api.schemas.base import StatusCode, SuccessResponse
 from valuecell.server.api.schemas.strategy import (
     StrategyCurveResponse,
@@ -190,6 +194,7 @@ def create_strategy_router() -> APIRouter:
                         or cfg.get("model_id")
                         or cfg.get("llm_model_id")
                     ),
+                    user_id=s.user_id,
                 )
                 strategy_data_list.append(item)
 
@@ -494,12 +499,16 @@ def create_strategy_router() -> APIRouter:
     async def stop_strategy(
         id: str = Query(..., description="Strategy ID"),
         db: Session = Depends(get_db),
+        current_user: Optional[str] = Depends(get_current_user_optional),
     ) -> StrategyStatusSuccessResponse:
         try:
             repo = get_strategy_repository(db_session=db)
             strategy = repo.get_strategy_by_strategy_id(id)
             if not strategy:
                 raise HTTPException(status_code=404, detail="Strategy not found")
+
+            # Ownership check
+            check_strategy_ownership(strategy, current_user)
 
             # Update status to 'stopped' and record user_stopped reason so
             # auto-resume will NOT restart this strategy on the next boot.

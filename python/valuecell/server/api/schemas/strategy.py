@@ -39,6 +39,7 @@ class StrategySummaryData(BaseModel):
         None, description="Associated exchange identifier"
     )
     model_id: Optional[str] = Field(None, description="Associated model identifier")
+    user_id: Optional[str] = Field(None, description="Owner user id")
 
 
 class StrategyListData(BaseModel):

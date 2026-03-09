@@ -59,6 +59,35 @@
           "description": "錯誤資訊：{{info}}"
         }
       }
+    },
+    "magicLink": {
+      "title": "登入",
+      "desc": "輸入電子郵件，我們將發送登入連結。",
+      "emailPlaceholder": "your@email.com",
+      "sendLink": "發送登入連結",
+      "sending": "發送中...",
+      "checkEmail": "請查收信件",
+      "sentDesc": "我們已向 {{email}} 發送了登入連結，點擊信件中的連結完成登入。",
+      "resend": "重新發送",
+      "invalidEmail": "請輸入有效的電子郵件地址",
+      "sendFailed": "發送失敗，請重試。"
+    },
+    "verify": {
+      "verifying": "正在驗證連結...",
+      "noToken": "無效的驗證連結。",
+      "success": "歡迎，{{name}}！",
+      "failed": "連結已失效或逾期，請重新申請。"
+    },
+    "gate": {
+      "title": "需要登入",
+      "desc": "請先登入後再執行此操作。",
+      "signIn": "登入",
+      "cancel": "取消",
+      "notOwner": "您沒有權限修改此策略。"
+    },
+    "profile": {
+      "title": "我的帳戶",
+      "signOut": "登出"
     }
   },
   "settings": {

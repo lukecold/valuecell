@@ -59,6 +59,35 @@
           "description": "情報: {{info}}"
         }
       }
+    },
+    "magicLink": {
+      "title": "サインイン",
+      "desc": "メールアドレスを入力するとマジックリンクをお送りします。",
+      "emailPlaceholder": "your@email.com",
+      "sendLink": "マジックリンクを送信",
+      "sending": "送信中...",
+      "checkEmail": "メールをご確認ください",
+      "sentDesc": "{{email}} にログインリンクを送信しました。メール内のリンクをクリックしてください。",
+      "resend": "再送信",
+      "invalidEmail": "有効なメールアドレスを入力してください",
+      "sendFailed": "送信に失敗しました。もう一度お試しください。"
+    },
+    "verify": {
+      "verifying": "リンクを確認中...",
+      "noToken": "無効な確認リンクです。",
+      "success": "ようこそ、{{name}}！",
+      "failed": "リンクが無効か期限切れです。新しいリンクをリクエストしてください。"
+    },
+    "gate": {
+      "title": "サインインが必要です",
+      "desc": "この操作を行うにはサインインしてください。",
+      "signIn": "サインイン",
+      "cancel": "キャンセル",
+      "notOwner": "このストラテジーを変更する権限がありません。"
+    },
+    "profile": {
+      "title": "マイアカウント",
+      "signOut": "サインアウト"
     }
   },
   "settings": {

@@ -33,6 +33,9 @@ export default [
     ]),
   ]),
 
+  // Auth routes
+  route("/auth/verify", "app/auth/verify.tsx"),
+
   // router for test components
   route("/test", "app/test.tsx"),
 ] satisfies RouteConfig;

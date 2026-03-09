@@ -3,11 +3,14 @@ import {
   type HTMLAttributes,
   memo,
   type ReactNode,
+  useRef,
   useMemo,
 } from "react";
+import { LogIn, LogOut, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation } from "react-router";
 import { useGetAgentList } from "@/api/agent";
+import { useLogout } from "@/api/auth";
 import {
   Conversation,
   Logo,
@@ -15,6 +18,13 @@ import {
   Setting,
   StrategyAgent,
 } from "@/assets/svg";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
@@ -22,9 +32,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import AppConversationSheet from "@/components/valuecell/app/app-conversation-sheet";
+import LoginModal, {
+  type LoginModalRef,
+} from "@/components/valuecell/auth/login-modal";
 import AgentAvatar from "@/components/valuecell/icon/agent-avatar";
 import SvgIcon from "@/components/valuecell/icon/svg-icon";
 import { cn } from "@/lib/utils";
+import { useIsLoggedIn, useSystemInfo } from "@/store/system-store";
 
 interface SidebarItemProps extends HTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
@@ -127,6 +141,10 @@ const SidebarMenuItem: FC<SidebarItemProps> = ({
 
 const AppSidebar: FC = () => {
   const { t } = useTranslation();
+  const isLoggedIn = useIsLoggedIn();
+  const systemInfo = useSystemInfo();
+  const logout = useLogout();
+  const loginModalRef = useRef<LoginModalRef>(null);
   const pathArray = useLocation().pathname.split("/");
 
   const prefix = useMemo(() => {
@@ -243,6 +261,56 @@ const AppSidebar: FC = () => {
 
       <SidebarFooter className="mt-auto pt-3">
         <SidebarMenu>
+          {/* User profile button — above settings */}
+          {isLoggedIn ? (
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuItem className="p-2">
+                      <User className="size-5" />
+                    </SidebarMenuItem>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  {systemInfo.email || t("auth.profile.title")}
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent side="right" align="end" className="w-52">
+                <div className="px-2 py-1.5">
+                  <p className="truncate font-medium text-sm">
+                    {systemInfo.name || systemInfo.email?.split("@")[0]}
+                  </p>
+                  <p className="truncate text-muted-foreground text-xs">
+                    {systemInfo.email}
+                  </p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={logout}
+                >
+                  <LogOut className="mr-2 size-4" />
+                  {t("auth.profile.signOut")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SidebarMenuItem
+                  className="p-2"
+                  onClick={() => loginModalRef.current?.open()}
+                >
+                  <LogIn className="size-5" />
+                </SidebarMenuItem>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {t("auth.magicLink.title")}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
           {navItems.config.map((item) => {
             return (
               <NavLink key={item.id} to={item.to}>
@@ -258,6 +326,8 @@ const AppSidebar: FC = () => {
           })}
         </SidebarMenu>
       </SidebarFooter>
+
+      <LoginModal ref={loginModalRef} />
     </Sidebar>
   );
 };

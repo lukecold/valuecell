@@ -12,6 +12,7 @@ export interface Strategy {
   created_at: string;
   exchange_id: string;
   model_id: string;
+  user_id?: string | null;
 }
 
 // Strategy Performance types

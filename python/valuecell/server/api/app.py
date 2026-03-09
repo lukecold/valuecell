@@ -24,6 +24,7 @@ from .exceptions import (
 )
 from .routers.agent import create_agent_router
 from .routers.agent_stream import create_agent_stream_router
+from .routers.auth import create_auth_router
 from .routers.conversation import create_conversation_router
 from .routers.i18n import create_i18n_router
 from .routers.models import create_models_router
@@ -293,6 +294,9 @@ def _add_routes(app: FastAPI, settings) -> None:
     @app.get(f"{API_PREFIX}/healthz", response_model=SuccessResponse)
     async def health_check():
         return SuccessResponse.create(msg="Welcome to ValueCell!")
+
+    # Include auth router
+    app.include_router(create_auth_router(), prefix=API_PREFIX)
 
     # Include i18n router
     app.include_router(create_i18n_router(), prefix=API_PREFIX)

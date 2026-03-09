@@ -6,9 +6,16 @@ import asyncio
 import os
 
 # New imports for delete endpoint
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
 from sqlalchemy.orm import Session
+
+from valuecell.server.api.auth_utils import (
+    check_strategy_ownership,
+    get_current_user_optional,
+)
 
 from valuecell.agents.common.trading.models import (
     ExchangeConfig,
@@ -325,6 +332,7 @@ def create_strategy_agent_router() -> APIRouter:
             True, description="Delete related records (holdings/details/portfolio)"
         ),
         db: Session = Depends(get_db),
+        current_user: Optional[str] = Depends(get_current_user_optional),
     ):
         """Delete a strategy created by StrategyAgent.
 
@@ -338,6 +346,9 @@ def create_strategy_agent_router() -> APIRouter:
             strategy = repo.get_strategy_by_strategy_id(id)
             if not strategy:
                 raise HTTPException(status_code=404, detail="Strategy not found")
+
+            # Ownership check
+            check_strategy_ownership(strategy, current_user)
 
             # Stop strategy before deletion (best-effort, idempotent).
             # Write user_stopped reason so auto-resume ignores this strategy
@@ -376,6 +387,7 @@ def create_strategy_agent_router() -> APIRouter:
     async def restart_strategy_agent(
         id: str = Query(..., description="Strategy ID to restart"),
         db: Session = Depends(get_db),
+        current_user: Optional[str] = Depends(get_current_user_optional),
     ):
         """Restart a stopped strategy.
 
@@ -388,6 +400,9 @@ def create_strategy_agent_router() -> APIRouter:
             strategy = repo.get_strategy_by_strategy_id(id)
             if not strategy:
                 raise HTTPException(status_code=404, detail="Strategy not found")
+
+            # Ownership check
+            check_strategy_ownership(strategy, current_user)
 
             current_status = getattr(strategy, "status", None)
             if current_status == StrategyStatus.RUNNING.value:

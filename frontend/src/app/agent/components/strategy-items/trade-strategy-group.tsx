@@ -1,7 +1,10 @@
 import { Copy, Eye, History, MoreVertical, Plus, RotateCcw, TrendingUp } from "lucide-react";
 import { type FC, memo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { useStrategyPerformance } from "@/api/strategy";
+import { useAuthGate } from "@/components/valuecell/auth/auth-gate-modal";
+import { useIsLoggedIn, useSystemInfo } from "@/store/system-store";
 import { DeleteStrategy, StrategyStatus } from "@/assets/svg";
 import {
   AlertDialog,
@@ -12,7 +15,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,8 +73,33 @@ const TradeStrategyCard: FC<TradeStrategyCardProps> = ({
   const { t } = useTranslation();
   const stockColors = useStockColors();
   const changeType = getChangeType(strategy.total_pnl_pct);
+  const isLoggedIn = useIsLoggedIn();
+  const systemInfo = useSystemInfo();
+  const { requireAuth } = useAuthGate();
+
+  // Determine if the current user can modify this strategy
+  const canModify = (() => {
+    if (!isLoggedIn) return false;
+    const owner = strategy.user_id;
+    if (!owner || owner === "default_user") return true;
+    return owner === systemInfo.email;
+  })();
+
+  const guardAction = (action: (() => void) | undefined) => {
+    if (!action) return;
+    if (!isLoggedIn) {
+      requireAuth(action);
+      return;
+    }
+    if (!canModify) {
+      toast.error(t("auth.gate.notOwner"));
+      return;
+    }
+    action();
+  };
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const strategyDetailModalRef = useRef<StrategyDetailModalRef>(null);
   const copyStrategyModalRef = useRef<CopyStrategyModelRef>(null);
   const promptHistoryModalRef = useRef<PromptHistoryModalRef>(null);
@@ -155,7 +182,7 @@ const TradeStrategyCard: FC<TradeStrategyCardProps> = ({
                 className="flex items-center gap-1.5 rounded-md px-2 py-1"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onRestart?.();
+                  guardAction(onRestart);
                 }}
               >
                 <RotateCcw className="size-3.5" />
@@ -165,45 +192,49 @@ const TradeStrategyCard: FC<TradeStrategyCardProps> = ({
               </Button>
             </div>
           ) : (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  disabled={strategy.status === "stopped"}
-                  size="sm"
-                  className="flex items-center gap-2.5 rounded-md px-2.5 py-1"
-                >
-                  {strategy.status === "running" && (
-                    <SvgIcon name={StrategyStatus} className="size-4" />
-                  )}
-                  <p className="font-medium text-foreground text-sm">
-                    {strategy.status === "running"
-                      ? t("strategy.status.running")
-                      : t("strategy.status.stopped")}
-                  </p>
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    {t("strategy.action.stop")}
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {t("strategy.action.stopDesc", {
-                      name: strategy.strategy_name,
-                    })}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>
-                    {t("strategy.action.cancel")}
-                  </AlertDialogCancel>
-                  <AlertDialogAction onClick={onStop}>
-                    {t("strategy.action.confirmStop")}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <>
+              <Button
+                variant="ghost"
+                disabled={strategy.status === "stopped"}
+                size="sm"
+                className="flex items-center gap-2.5 rounded-md px-2.5 py-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  guardAction(() => setIsStopping(true));
+                }}
+              >
+                {strategy.status === "running" && (
+                  <SvgIcon name={StrategyStatus} className="size-4" />
+                )}
+                <p className="font-medium text-foreground text-sm">
+                  {strategy.status === "running"
+                    ? t("strategy.status.running")
+                    : t("strategy.status.stopped")}
+                </p>
+              </Button>
+              <AlertDialog open={isStopping} onOpenChange={setIsStopping}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      {t("strategy.action.stop")}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t("strategy.action.stopDesc", {
+                        name: strategy.strategy_name,
+                      })}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>
+                      {t("strategy.action.cancel")}
+                    </AlertDialogCancel>
+                    <AlertDialogAction onClick={onStop}>
+                      {t("strategy.action.confirmStop")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
           )}
 
           <DropdownMenu>
@@ -267,7 +298,9 @@ const TradeStrategyCard: FC<TradeStrategyCardProps> = ({
                 <Copy className="ml-1 size-5" />
                 {t("strategy.action.duplicate")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setIsDeleting(true)}>
+              <DropdownMenuItem
+                onClick={() => guardAction(() => setIsDeleting(true))}
+              >
                 <SvgIcon
                   name={DeleteStrategy}
                   className="size-6 text-red-500"
