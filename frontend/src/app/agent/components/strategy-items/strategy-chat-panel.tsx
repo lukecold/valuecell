@@ -9,7 +9,14 @@ import {
   User,
   X,
 } from "lucide-react";
-import { type FC, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FC,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   type ChatStreamDoneEvent,
@@ -17,6 +24,7 @@ import {
   useUpdateStrategyPromptMutation,
 } from "@/api/strategy";
 import { Button } from "@/components/ui/button";
+import { type ChatMessage, useChatStore } from "@/store/chat-store";
 
 // ---------------------------------------------------------------------------
 // Diff helpers
@@ -114,13 +122,8 @@ const ProposalDiff: FC<{ original: string; proposed: string }> = ({
 // Types
 // ---------------------------------------------------------------------------
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  proposal?: string;
-  originalPrompt?: string;
-  proposalStatus?: "pending" | "accepted" | "rejected";
-}
+/** Re-export ChatMessage under the local alias used throughout this file. */
+type Message = ChatMessage;
 
 interface StrategyChatPanelProps {
   /** Strategy ID — typed as string|number to match the existing Strategy type  */
@@ -133,7 +136,25 @@ interface StrategyChatPanelProps {
 
 const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
   const { t } = useTranslation();
-  const [messages, setMessages] = useState<Message[]>([]);
+
+  // ── Persistent message state (survives tab switches / strategy re-selects) ──
+  const strategyKey = String(strategyId);
+  const storeMessages = useChatStore((s) => s.getMessages(strategyKey));
+  const storeSetMessages = useChatStore((s) => s.setMessages);
+  const messages = storeMessages;
+  /** Stable setter that accepts either a value or a functional updater. */
+  const setMessages = useCallback(
+    (updaterOrValue: Message[] | ((prev: Message[]) => Message[])) => {
+      const current = useChatStore.getState().getMessages(strategyKey);
+      const next =
+        typeof updaterOrValue === "function"
+          ? updaterOrValue(current)
+          : updaterOrValue;
+      storeSetMessages(strategyKey, next);
+    },
+    [strategyKey, storeSetMessages],
+  );
+
   const [input, setInput] = useState("");
   const [refiningIndex, setRefiningIndex] = useState<number | null>(null);
   const [refineInput, setRefineInput] = useState("");
