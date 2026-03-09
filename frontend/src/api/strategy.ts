@@ -196,18 +196,23 @@ export const useDeleteStrategyPrompt = () => {
 
 export const useStrategyChatMutation = () => {
   return useMutation({
-    mutationFn: (data: {
+    mutationFn: ({
+      signal,
+      ...body
+    }: {
       strategy_id: string;
       message: string;
       history?: { role: string; content: string }[];
+      signal?: AbortSignal;
     }) =>
       apiClient.post<
         ApiResponse<{
           strategy_id: string;
           explanation: string;
           prompt_proposal?: string;
+          original_prompt?: string;
         }>
-      >("/strategies/chat", data),
+      >("/strategies/chat", body, { signal }),
   });
 };
 

@@ -13,6 +13,7 @@ PATCH /strategies/update-prompt
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from typing import Optional
@@ -65,8 +66,8 @@ class StrategyChatRequest(BaseModel):
     strategy_id: str
     message: str
     history: list[ChatMessage] = []
-    recent_cycles: int = 10
-    recent_trades: int = 20
+    recent_cycles: int = 5
+    recent_trades: int = 10
 
 
 class UpdatePromptRequest(BaseModel):
@@ -210,6 +211,12 @@ def create_strategy_chat_router() -> APIRouter:
                 detail="Strategy LLM config is not available in the database",
             )
 
+        # Extract the current prompt text so we can include it in the diff on the FE
+        tc: dict = cfg.get("trading_config") or {}
+        current_prompt_text: str = (
+            tc.get("prompt_text") or tc.get("custom_prompt") or ""
+        )
+
         user_message = _build_context(strategy, req, repo)
 
         try:
@@ -223,10 +230,16 @@ def create_strategy_chat_router() -> APIRouter:
                 instructions=[_CHAT_SYSTEM_PROMPT],
                 markdown=False,
             )
-            response = await agent.arun(user_message)
+            response = await asyncio.wait_for(
+                agent.arun(user_message), timeout=120.0
+            )
             raw = getattr(response, "content", None) or response
             if not isinstance(raw, str):
                 raw = str(raw)
+        except asyncio.TimeoutError:
+            raise HTTPException(
+                status_code=504, detail="LLM call timed out after 120 seconds"
+            )
         except Exception as exc:
             logger.exception(
                 "Chat LLM call failed for strategy {}", req.strategy_id
@@ -246,6 +259,8 @@ def create_strategy_chat_router() -> APIRouter:
         }
         if prompt_proposal:
             result["prompt_proposal"] = prompt_proposal
+            # Include the original so the frontend can render a diff
+            result["original_prompt"] = current_prompt_text
 
         return SuccessResponse.create(data=result, msg="Chat response generated")
 

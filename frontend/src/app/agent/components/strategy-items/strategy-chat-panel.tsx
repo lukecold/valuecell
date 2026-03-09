@@ -1,5 +1,15 @@
-import { Bot, Check, ChevronDown, ChevronUp, Loader2, Send, User, X } from "lucide-react";
-import { type FC, useEffect, useRef, useState } from "react";
+import {
+  Bot,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Send,
+  Square,
+  User,
+  X,
+} from "lucide-react";
+import { type FC, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   useStrategyChatMutation,
@@ -7,10 +17,107 @@ import {
 } from "@/api/strategy";
 import { Button } from "@/components/ui/button";
 
+// ---------------------------------------------------------------------------
+// Diff helpers
+// ---------------------------------------------------------------------------
+
+interface DiffLine {
+  type: "unchanged" | "added" | "removed";
+  text: string;
+}
+
+/** Line-level LCS diff. Returns an array of diff lines in order. */
+function computeLineDiff(original: string, proposed: string): DiffLine[] {
+  const a = original.split("\n");
+  const b = proposed.split("\n");
+  const m = a.length;
+  const n = b.length;
+
+  // Build LCS table
+  const dp: number[][] = Array.from({ length: m + 1 }, () =>
+    new Array(n + 1).fill(0),
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+
+  // Backtrack
+  const result: DiffLine[] = [];
+  let i = m;
+  let j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+      result.unshift({ type: "unchanged", text: a[i - 1] });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.unshift({ type: "added", text: b[j - 1] });
+      j--;
+    } else {
+      result.unshift({ type: "removed", text: a[i - 1] });
+      i--;
+    }
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// ProposalDiff component
+// ---------------------------------------------------------------------------
+
+const ProposalDiff: FC<{ original: string; proposed: string }> = ({
+  original,
+  proposed,
+}) => {
+  const diff = useMemo(
+    () =>
+      original
+        ? computeLineDiff(original, proposed)
+        : proposed
+            .split("\n")
+            .map((text) => ({ type: "added" as const, text })),
+    [original, proposed],
+  );
+
+  return (
+    <div className="max-h-52 overflow-y-auto rounded-md border border-border bg-muted/40 font-mono text-xs leading-5">
+      {diff.map((line, idx) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: stable diff output
+        <div
+          key={idx}
+          className={
+            line.type === "added"
+              ? "bg-green-500/10 text-green-700 dark:text-green-400"
+              : line.type === "removed"
+                ? "bg-red-500/10 text-red-700 dark:text-red-400"
+                : "text-muted-foreground"
+          }
+        >
+          <span className="mr-2 select-none opacity-60">
+            {line.type === "added" ? "+" : line.type === "removed" ? "−" : " "}
+          </span>
+          {/* preserve empty lines */}
+          {line.text || "\u00A0"}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 interface Message {
   role: "user" | "assistant";
   content: string;
   proposal?: string;
+  originalPrompt?: string;
   proposalStatus?: "pending" | "accepted" | "rejected";
 }
 
@@ -18,6 +125,10 @@ interface StrategyChatPanelProps {
   /** Strategy ID — typed as string|number to match the existing Strategy type  */
   strategyId: string | number;
 }
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
   const { t } = useTranslation();
@@ -30,6 +141,8 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
   );
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
   const { mutateAsync: sendChat, isPending } = useStrategyChatMutation();
   const { mutateAsync: updatePrompt, isPending: isUpdating } =
     useUpdateStrategyPromptMutation();
@@ -47,6 +160,11 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
         : m.content,
     }));
 
+  const handleStop = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  };
+
   const send = async (text: string, baseMessages?: Message[]) => {
     const trimmed = text.trim();
     if (!trimmed || isPending) return;
@@ -60,19 +178,24 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
     setMessages(nextMessages);
     setInput("");
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       const res = await sendChat({
         strategy_id: String(strategyId),
         message: trimmed,
         history,
+        signal: controller.signal,
       });
-      const { explanation, prompt_proposal } = res.data;
+      const { explanation, prompt_proposal, original_prompt } = res.data;
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           content: explanation,
           proposal: prompt_proposal,
+          originalPrompt: original_prompt,
           proposalStatus: prompt_proposal ? "pending" : undefined,
         },
       ]);
@@ -80,15 +203,22 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
       if (prompt_proposal) {
         setExpandedProposals((prev) => {
           const next = new Set(prev);
-          next.add(nextMessages.length); // index of the new assistant message
+          next.add(nextMessages.length);
           return next;
         });
       }
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: t("strategy.chat.error") },
-      ]);
+    } catch (err) {
+      const aborted =
+        controller.signal.aborted ||
+        (err instanceof DOMException && err.name === "AbortError");
+      if (!aborted) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: t("strategy.chat.error") },
+        ]);
+      }
+    } finally {
+      abortRef.current = null;
     }
 
     inputRef.current?.focus();
@@ -126,7 +256,6 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
     if (!trimmed) return;
     const msg = messages[index];
     const refinementMessage = `Please revise the following prompt proposal based on my feedback.\n\nCurrent proposal:\n${msg.proposal}\n\nFeedback: ${trimmed}`;
-    // Mark old proposal as rejected before sending the follow-up
     const updated = messages.map((m, i) =>
       i === index ? { ...m, proposalStatus: "rejected" as const } : m,
     );
@@ -233,10 +362,11 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
 
                     {expandedProposals.has(i) && (
                       <div className="border-border border-t px-3 pb-3 pt-2">
-                        {/* Proposal text */}
-                        <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap text-muted-foreground text-xs leading-relaxed">
-                          {msg.proposal}
-                        </pre>
+                        {/* Diff view */}
+                        <ProposalDiff
+                          original={msg.originalPrompt ?? ""}
+                          proposed={msg.proposal}
+                        />
 
                         {msg.proposalStatus === "pending" && (
                           <>
@@ -338,24 +468,26 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
               send(input);
             }
           }}
           disabled={isPending}
         />
-        <Button
-          size="icon"
-          onClick={() => send(input)}
-          disabled={!input.trim() || isPending}
-        >
-          {isPending ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
+        {isPending ? (
+          <Button size="icon" variant="outline" onClick={handleStop}>
+            <Square className="size-4" />
+          </Button>
+        ) : (
+          <Button
+            size="icon"
+            onClick={() => send(input)}
+            disabled={!input.trim()}
+          >
             <Send className="size-4" />
-          )}
-        </Button>
+          </Button>
+        )}
       </div>
     </div>
   );
