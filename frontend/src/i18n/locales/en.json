@@ -240,7 +240,10 @@
       "versions": "Versions",
       "current": "Current",
       "diffHint": "Green = added · Red = removed",
-      "selectTwo": "Select two versions to compare"
+      "selectTwo": "Select two versions to compare",
+      "onlyOne": "This is the only version. Prompt changes will be tracked here as you evolve your strategy.",
+      "inlineView": "Inline",
+      "splitView": "Side by side"
     },
     "portfolio": {
       "title": "Portfolio Value History",

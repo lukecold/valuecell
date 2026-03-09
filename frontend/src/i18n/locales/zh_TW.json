@@ -240,7 +240,10 @@
       "versions": "版本列表",
       "current": "目前",
       "diffHint": "綠色 = 新增 · 紅色 = 刪除",
-      "selectTwo": "選擇兩個版本進行比較"
+      "selectTwo": "選擇兩個版本進行比較",
+      "onlyOne": "目前只有一個版本。隨著策略的演進，Prompt 變更將在此記錄。",
+      "inlineView": "單列",
+      "splitView": "並排"
     },
     "portfolio": {
       "title": "投資組合價值歷史",
