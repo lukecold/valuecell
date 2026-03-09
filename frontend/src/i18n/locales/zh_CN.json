@@ -230,7 +230,17 @@
       "publish": "发布",
       "shareToSocial": "分享到社交媒体",
       "shareToRanking": "分享到排行榜",
-      "restart": "重新启动"
+      "restart": "重新启动",
+      "promptHistory": "Prompt 版本历史"
+    },
+    "promptHistory": {
+      "title": "Prompt 版本历史",
+      "loading": "加载版本中...",
+      "empty": "暂无 Prompt 历史记录。每次接受 Chat 建议时将自动保存版本。",
+      "versions": "版本列表",
+      "current": "当前",
+      "diffHint": "绿色 = 新增 · 红色 = 删除",
+      "selectTwo": "选择两个版本进行对比"
     },
     "portfolio": {
       "title": "投资组合价值历史",

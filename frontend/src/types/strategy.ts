@@ -149,3 +149,11 @@ export interface PortfolioSummary {
   total_value: number;
   total_pnl: number;
 }
+
+// Prompt Version types
+export interface PromptVersion {
+  version: number;
+  prompt_text: string;
+  saved_at: string;
+  is_current: boolean;
+}

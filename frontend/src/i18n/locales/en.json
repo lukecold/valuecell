@@ -230,7 +230,17 @@
       "publish": "Publish",
       "shareToSocial": "Share to Social",
       "shareToRanking": "Share to Ranking",
-      "restart": "Restart"
+      "restart": "Restart",
+      "promptHistory": "Prompt History"
+    },
+    "promptHistory": {
+      "title": "Prompt Version History",
+      "loading": "Loading versions...",
+      "empty": "No prompt history yet. Versions are saved each time you accept a chat suggestion.",
+      "versions": "Versions",
+      "current": "Current",
+      "diffHint": "Green = added · Red = removed",
+      "selectTwo": "Select two versions to compare"
     },
     "portfolio": {
       "title": "Portfolio Value History",

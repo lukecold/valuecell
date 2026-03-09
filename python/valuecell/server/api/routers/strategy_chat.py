@@ -268,6 +268,7 @@ def create_strategy_chat_router() -> APIRouter:
     async def update_strategy_prompt(req: UpdatePromptRequest):
         """
         Apply a prompt improvement to the strategy's stored configuration.
+        The old prompt is saved to strategy_metadata.prompt_history before overwriting.
         The new prompt is used on the next decision cycle.
         """
         repo = get_strategy_repository()
@@ -275,15 +276,81 @@ def create_strategy_chat_router() -> APIRouter:
         if not strategy:
             raise HTTPException(status_code=404, detail="Strategy not found")
 
+        from datetime import datetime, timezone
+
         cfg = dict(strategy.config or {})
         tc = dict(cfg.get("trading_config") or {})
+
+        # Archive the current prompt into metadata.prompt_history before overwriting
+        current_prompt = tc.get("prompt_text") or tc.get("custom_prompt") or ""
+        if current_prompt:
+            meta = dict(strategy.strategy_metadata or {})
+            history: list = list(meta.get("prompt_history") or [])
+            history.append(
+                {
+                    "prompt_text": current_prompt,
+                    "saved_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            meta["prompt_history"] = history
+        else:
+            meta = dict(strategy.strategy_metadata or {})
+
         tc["prompt_text"] = req.prompt_text
         cfg["trading_config"] = tc
-        repo.upsert_strategy(req.strategy_id, config=cfg)
+        repo.upsert_strategy(req.strategy_id, config=cfg, metadata=meta)
 
         return SuccessResponse.create(
             data={"strategy_id": req.strategy_id},
             msg="Strategy prompt updated",
         )
+
+    @router.get("/prompt-history")
+    async def get_prompt_history(id: str):
+        """
+        Return all saved versions of a strategy's prompt plus the current one.
+
+        Each entry has:
+          - version: 1-based index (oldest = 1)
+          - prompt_text: the prompt content
+          - saved_at: ISO timestamp of when the version was archived
+          - is_current: true only for the active prompt
+        """
+        repo = get_strategy_repository()
+        strategy = repo.get_strategy_by_strategy_id(id)
+        if not strategy:
+            raise HTTPException(status_code=404, detail="Strategy not found")
+
+        cfg: dict = strategy.config or {}
+        tc: dict = cfg.get("trading_config") or {}
+        current_prompt = tc.get("prompt_text") or tc.get("custom_prompt") or ""
+
+        meta: dict = strategy.strategy_metadata or {}
+        history: list = meta.get("prompt_history") or []
+
+        from datetime import datetime, timezone
+
+        versions = []
+        for i, entry in enumerate(history):
+            versions.append(
+                {
+                    "version": i + 1,
+                    "prompt_text": entry.get("prompt_text", ""),
+                    "saved_at": entry.get("saved_at", ""),
+                    "is_current": False,
+                }
+            )
+
+        # Add current as the latest version
+        versions.append(
+            {
+                "version": len(history) + 1,
+                "prompt_text": current_prompt,
+                "saved_at": datetime.now(timezone.utc).isoformat(),
+                "is_current": True,
+            }
+        )
+
+        return SuccessResponse.create(data=versions, msg="Prompt history retrieved")
 
     return router

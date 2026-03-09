@@ -230,7 +230,17 @@
       "publish": "發布",
       "shareToSocial": "分享到社交媒體",
       "shareToRanking": "分享到排行榜",
-      "restart": "重新啟動"
+      "restart": "重新啟動",
+      "promptHistory": "Prompt 版本歷史"
+    },
+    "promptHistory": {
+      "title": "Prompt 版本歷史",
+      "loading": "載入版本中...",
+      "empty": "尚無 Prompt 歷史紀錄。每次接受 Chat 建議時將自動儲存版本。",
+      "versions": "版本列表",
+      "current": "目前",
+      "diffHint": "綠色 = 新增 · 紅色 = 刪除",
+      "selectTwo": "選擇兩個版本進行比較"
     },
     "portfolio": {
       "title": "投資組合價值歷史",

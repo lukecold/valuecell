@@ -5,6 +5,7 @@ import type {
   CreateStrategy,
   PortfolioSummary,
   Position,
+  PromptVersion,
   Strategy,
   StrategyCompose,
   StrategyPerformance,
@@ -223,6 +224,21 @@ export const useUpdateStrategyPromptMutation = () => {
         "/strategies/update-prompt",
         data,
       ),
+  });
+};
+
+export const useGetPromptHistory = (
+  strategyId?: string | number,
+  enabled = true,
+) => {
+  return useQuery({
+    queryKey: API_QUERY_KEYS.STRATEGY.promptHistory([strategyId ?? ""]),
+    queryFn: () =>
+      apiClient.get<ApiResponse<PromptVersion[]>>(
+        `/strategies/prompt-history?id=${strategyId}`,
+      ),
+    select: (data) => data.data,
+    enabled: !!strategyId && enabled,
   });
 };
 

@@ -1,4 +1,4 @@
-import { Copy, Eye, MoreVertical, Plus, RotateCcw, TrendingUp } from "lucide-react";
+import { Copy, Eye, History, MoreVertical, Plus, RotateCcw, TrendingUp } from "lucide-react";
 import { type FC, memo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useStrategyPerformance } from "@/api/strategy";
@@ -35,6 +35,9 @@ import { formatChange, getChangeType } from "@/lib/utils";
 import { useStockColors } from "@/store/settings-store";
 import type { Strategy } from "@/types/strategy";
 import CreateStrategyModal from "./modals/create-strategy-modal";
+import PromptHistoryModal, {
+  type PromptHistoryModalRef,
+} from "./modals/prompt-history-modal";
 import StrategyDetailModal, {
   type StrategyDetailModalRef,
 } from "./modals/strategy-detail-modal";
@@ -72,6 +75,7 @@ const TradeStrategyCard: FC<TradeStrategyCardProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const strategyDetailModalRef = useRef<StrategyDetailModalRef>(null);
   const copyStrategyModalRef = useRef<CopyStrategyModelRef>(null);
+  const promptHistoryModalRef = useRef<PromptHistoryModalRef>(null);
 
   const { refetch: refetchStrategyPerformance } = useStrategyPerformance(
     strategy.strategy_id,
@@ -218,6 +222,15 @@ const TradeStrategyCard: FC<TradeStrategyCardProps> = ({
                 {t("strategy.action.details")}
               </DropdownMenuItem>
               <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  promptHistoryModalRef.current?.open(strategy.strategy_id);
+                }}
+              >
+                <History className="ml-1 size-5" />
+                {t("strategy.action.promptHistory")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 onClick={async () => {
                   const { data: strategyDetail } =
                     await refetchStrategyPerformance();
@@ -291,6 +304,7 @@ const TradeStrategyCard: FC<TradeStrategyCardProps> = ({
 
       <StrategyDetailModal ref={strategyDetailModalRef} />
       <CopyStrategyModal ref={copyStrategyModalRef} />
+      <PromptHistoryModal ref={promptHistoryModalRef} />
     </div>
   );
 };

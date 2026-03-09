@@ -230,7 +230,17 @@
       "publish": "公開",
       "shareToSocial": "SNSでシェア",
       "shareToRanking": "ランキングでシェア",
-      "restart": "再起動"
+      "restart": "再起動",
+      "promptHistory": "プロンプト履歴"
+    },
+    "promptHistory": {
+      "title": "プロンプトバージョン履歴",
+      "loading": "バージョンを読み込み中...",
+      "empty": "プロンプト履歴がありません。チャットの提案を承認するたびに自動保存されます。",
+      "versions": "バージョン一覧",
+      "current": "現在",
+      "diffHint": "緑 = 追加 · 赤 = 削除",
+      "selectTwo": "比較する2つのバージョンを選択してください"
     },
     "portfolio": {
       "title": "ポートフォリオ価値履歴",

@@ -42,6 +42,7 @@ const STRATEGY_QUERY_KEYS = {
   strategyPrompts: ["strategy", "prompts"],
   strategyPortfolioSummary: queryKeyFn(["strategy", "portfolio-summary"]),
   strategyPerformance: queryKeyFn(["strategy", "performance"]),
+  promptHistory: queryKeyFn(["strategy", "prompt-history"]),
 } as const;
 
 const SYSTEM_QUERY_KEYS = {
