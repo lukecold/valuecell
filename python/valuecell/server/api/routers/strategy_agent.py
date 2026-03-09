@@ -12,11 +12,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
 from sqlalchemy.orm import Session
 
-from valuecell.server.api.auth_utils import (
-    check_strategy_ownership,
-    get_current_user_optional,
-)
-
 from valuecell.agents.common.trading.models import (
     ExchangeConfig,
     StopReason,
@@ -29,6 +24,10 @@ from valuecell.agents.common.trading.models import (
 from valuecell.config.loader import get_config_loader
 from valuecell.core.coordinate.orchestrator import AgentOrchestrator
 from valuecell.core.types import CommonResponseEvent, UserInput, UserInputMetadata
+from valuecell.server.api.auth_utils import (
+    check_strategy_ownership,
+    get_current_user_optional,
+)
 from valuecell.server.api.schemas.base import ErrorResponse, StatusCode, SuccessResponse
 
 # Note: Strategy type is now part of TradingConfig in the request body.
@@ -36,8 +35,8 @@ from valuecell.server.db.connection import get_db
 from valuecell.server.db.repositories import get_strategy_repository
 from valuecell.server.services.gcp_secrets import load_gcp_secret_to_env
 from valuecell.server.services.strategy_autoresume import (
-    auto_resume_strategies,
     _resume_one,
+    auto_resume_strategies,
 )
 from valuecell.utils.uuid import generate_conversation_id
 
