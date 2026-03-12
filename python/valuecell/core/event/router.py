@@ -154,16 +154,17 @@ async def handle_status_update(
 
     # general messages
     if state == TaskState.working and EventPredicates.is_message(response_event):
-        responses.append(
-            response_factory.message_response_general(
-                event=response_event,
-                conversation_id=task.conversation_id,
-                thread_id=thread_id,
-                task_id=task.task_id,
-                content=content,
-                agent_name=task.agent_name,
+        if content:  # Skip empty content to avoid empty bubbles in the UI
+            responses.append(
+                response_factory.message_response_general(
+                    event=response_event,
+                    conversation_id=task.conversation_id,
+                    thread_id=thread_id,
+                    task_id=task.task_id,
+                    content=content,
+                    agent_name=task.agent_name,
+                )
             )
-        )
         return RouteResult(responses)
 
     return RouteResult(responses)

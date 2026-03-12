@@ -18,7 +18,19 @@ const ChatItemArea: FC<ChatItemAreaProps> = ({ items }) => {
 
   return (
     <div className="space-y-3">
-      {items.map((item) => (
+      {items.map((item) => {
+        // Skip rendering entirely when there's no meaningful content to display
+        if (!item.payload || !item.payload.content) {
+          if (
+            item.component_type === "markdown" ||
+            item.component_type === "subagent_conversation" ||
+            item.component_type === "scheduled_task_controller"
+          ) {
+            return null;
+          }
+        }
+
+        return (
         <div
           key={item.item_id}
           className={cn(
@@ -79,7 +91,8 @@ const ChatItemArea: FC<ChatItemAreaProps> = ({ items }) => {
             })()}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

@@ -314,10 +314,17 @@ class ConversationService:
         event_lower = event.lower()
 
         # Map common event patterns to expected names
+        # More specific patterns must be checked before broader ones
         if "message_chunk" in event_lower or "chunk" in event_lower:
             return "message_chunk"
+        elif "reasoning_started" in event_lower:
+            return "reasoning_started"
+        elif "reasoning_completed" in event_lower:
+            return "reasoning_completed"
         elif "reasoning" in event_lower:
             return "reasoning"
+        elif "tool_call_started" in event_lower:
+            return "tool_call_started"
         elif "tool_call_completed" in event_lower or "tool_completed" in event_lower:
             return "tool_call_completed"
         elif "component_generator" in event_lower or "component" in event_lower:
