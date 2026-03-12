@@ -209,6 +209,8 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    let accumulatedContent = "";
+
     try {
       await streamStrategyChat(
         {
@@ -217,11 +219,19 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
           history,
         },
         {
-          onChunk: (text) => setStreamingContent((prev) => prev + text),
+          onChunk: (text) => {
+            accumulatedContent += text;
+            setStreamingContent((prev) => prev + text);
+          },
           onDone: (event: ChatStreamDoneEvent) => {
+            const content = event.explanation || accumulatedContent;
+            if (!content) {
+              setStreamingContent("");
+              return;
+            }
             const assistantMsg: Message = {
               role: "assistant",
-              content: event.explanation,
+              content,
               proposal: event.prompt_proposal,
               originalPrompt: event.original_prompt,
               proposalStatus: event.prompt_proposal ? "pending" : undefined,

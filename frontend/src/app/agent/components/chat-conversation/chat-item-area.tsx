@@ -23,6 +23,7 @@ const ChatItemArea: FC<ChatItemAreaProps> = ({ items }) => {
         if (!item.payload || !item.payload.content) {
           if (
             item.component_type === "markdown" ||
+            item.component_type === "tool_call" ||
             item.component_type === "subagent_conversation" ||
             item.component_type === "scheduled_task_controller"
           ) {
