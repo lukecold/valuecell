@@ -248,9 +248,10 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
             }
           },
           onError: (message) => {
+            const errorContent = message || t("strategy.chat.error");
             setMessages((prev) => [
               ...prev,
-              { role: "assistant", content: message },
+              { role: "assistant", content: errorContent },
             ]);
             setStreamingContent("");
           },
@@ -363,7 +364,12 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {messages.map((msg, i) => (
+            {messages.map((msg, i) => {
+              // Skip assistant messages with no content and no proposal
+              if (msg.role === "assistant" && !msg.content && !msg.proposal) {
+                return null;
+              }
+              return (
               // biome-ignore lint/suspicious/noArrayIndexKey: stable list
               <div key={i} className="flex flex-col gap-2">
                 {/* Bubble */}
@@ -499,7 +505,8 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
 
             {/* Streaming assistant bubble */}
             {isStreaming && (

@@ -46,28 +46,32 @@ const StrategyComposeItem: FC<StrategyComposeItemProps> = ({ compose }) => {
       </div>
 
       {/* AI Reasoning Logic */}
-      <p className="text-muted-foreground text-xs">
-        {t("strategy.history.aiReasoning")}
-      </p>
-      <Collapsible open={isReasoningOpen} onOpenChange={setIsReasoningOpen}>
-        <CollapsibleTrigger
-          data-active={isReasoningOpen}
-          className="flex w-full cursor-pointer items-start justify-between rounded-md border-gradient bg-card px-3 py-2 text-left"
-        >
-          <span
-            className={`text-foreground text-sm leading-relaxed ${
-              isReasoningOpen ? "" : "line-clamp-1"
-            }`}
-          >
-            {compose.rationale}
-          </span>
-          <ChevronDown
-            className={`mt-1 ml-2 size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
-              isReasoningOpen ? "rotate-180" : ""
-            }`}
-          />
-        </CollapsibleTrigger>
-      </Collapsible>
+      {compose.rationale && (
+        <>
+          <p className="text-muted-foreground text-xs">
+            {t("strategy.history.aiReasoning")}
+          </p>
+          <Collapsible open={isReasoningOpen} onOpenChange={setIsReasoningOpen}>
+            <CollapsibleTrigger
+              data-active={isReasoningOpen}
+              className="flex w-full cursor-pointer items-start justify-between rounded-md border-gradient bg-card px-3 py-2 text-left"
+            >
+              <span
+                className={`text-foreground text-sm leading-relaxed ${
+                  isReasoningOpen ? "" : "line-clamp-1"
+                }`}
+              >
+                {compose.rationale}
+              </span>
+              <ChevronDown
+                className={`mt-1 ml-2 size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                  isReasoningOpen ? "rotate-180" : ""
+                }`}
+              />
+            </CollapsibleTrigger>
+          </Collapsible>
+        </>
+      )}
 
       {/* Perform Operation */}
       {compose.actions.length > 0 && (
