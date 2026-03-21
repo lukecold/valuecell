@@ -523,6 +523,44 @@ class StrategyRepository:
             if not self.db_session:
                 session.close()
 
+    def get_max_cycle_index(self, strategy_id: str) -> Optional[int]:
+        """Return the highest cycle_index for a strategy, or None."""
+        session = self._get_session()
+        try:
+            result = (
+                session.query(func.max(StrategyComposeCycle.cycle_index))
+                .filter(StrategyComposeCycle.strategy_id == strategy_id)
+                .scalar()
+            )
+            return result
+        finally:
+            if not self.db_session:
+                session.close()
+
+    def get_cycles_by_indices(
+        self, strategy_id: str, cycle_indices: List[int]
+    ) -> List[StrategyComposeCycle]:
+        """Fetch cycles matching specific cycle_index values."""
+        if not cycle_indices:
+            return []
+        session = self._get_session()
+        try:
+            items = (
+                session.query(StrategyComposeCycle)
+                .filter(
+                    StrategyComposeCycle.strategy_id == strategy_id,
+                    StrategyComposeCycle.cycle_index.in_(cycle_indices),
+                )
+                .order_by(asc(StrategyComposeCycle.cycle_index))
+                .all()
+            )
+            for item in items:
+                session.expunge(item)
+            return items
+        finally:
+            if not self.db_session:
+                session.close()
+
     def get_instructions_by_compose(
         self, strategy_id: str, compose_id: str
     ) -> List[StrategyInstruction]:

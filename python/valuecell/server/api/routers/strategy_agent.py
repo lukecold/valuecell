@@ -169,7 +169,7 @@ def create_strategy_agent_router() -> APIRouter:
             )
 
             if strategy_type_enum == StrategyType.PROMPT:
-                agent_name = "PromptBasedStrategyAgent"
+                agent_name = "StrategyAgent"
             elif strategy_type_enum == StrategyType.GRID:
                 agent_name = "GridStrategyAgent"
             else:

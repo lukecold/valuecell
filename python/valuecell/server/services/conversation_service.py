@@ -28,7 +28,7 @@ from valuecell.utils import resolve_db_path
 # should be excluded from the general conversation list returned to clients.
 # Keep this set small and focused; extend if new strategy agents are added.
 STRATEGY_AGENT_NAMES = {
-    "PromptBasedStrategyAgent",
+    "StrategyAgent",
     "GridStrategyAgent",
 }
 

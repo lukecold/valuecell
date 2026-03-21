@@ -1,6 +1,6 @@
 {
-  "name": "PromptBasedStrategyAgent",
-  "display_name": "Prompt-based Strategy Agent",
+  "name": "StrategyAgent",
+  "display_name": "Strategy Agent",
   "url": "http://localhost:10006/",
   "description": "LLM-driven strategy composer that turns market features into normalized trade instructions. Includes a simple runtime for demo and testing.",
   "capabilities": {
@@ -21,7 +21,6 @@
   ],
   "enabled": true,
   "metadata": {
-    "hidden": true,
     "planner_passthrough": true,
     "version": "0.1.0",
     "author": "ValueCell Team",

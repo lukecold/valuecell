@@ -34,6 +34,27 @@ from valuecell.server.api.schemas.base import SuccessResponse
 from valuecell.server.db.repositories import get_strategy_repository
 from valuecell.utils.model import create_model_with_provider
 
+_MAX_CYCLE_FETCH = 25
+
+_CYCLE_EXTRACT_PROMPT = """\
+You are a helper that extracts cycle numbers from user messages.
+A "cycle" refers to a numbered decision cycle of a trading strategy.
+The strategy has cycles numbered 1 through {max_cycle}.
+
+Given the user's message, return ONLY a JSON array of integer cycle numbers
+the user wants to inspect. If the user does not ask about specific cycles,
+return an empty array.
+
+Examples:
+- "What happened in cycle 5?" → [5]
+- "Compare cycles 3 and 7" → [3, 7]
+- "Show me cycles 10-15" → [10, 11, 12, 13, 14, 15]
+- "Why did the last 3 cycles all go long?" → []
+- "How is the strategy doing?" → []
+
+Return ONLY the JSON array, nothing else.
+"""
+
 _CHAT_SYSTEM_PROMPT = """\
 You are an analyst embedded in an autonomous crypto trading strategy.
 Your job is to answer the user's questions about this strategy clearly and concisely.
@@ -192,7 +213,103 @@ def _parse_llm_response(raw: str) -> dict:
     return {"explanation": raw, "is_mistake": False}
 
 
-def _build_context(strategy, req: StrategyChatRequest, repo) -> str:
+_CYCLE_EXTRACT_MODEL = "deepseek-chat"
+
+
+async def _extract_requested_cycles(
+    provider: str, api_key: Optional[str], message: str, max_cycle: int
+) -> list[int]:
+    """Quick AI call (deepseek-chat) to extract cycle numbers from the user message."""
+    prompt = _CYCLE_EXTRACT_PROMPT.format(max_cycle=max_cycle)
+    try:
+        extract_model = create_model_with_provider(
+            provider=provider,
+            model_id=_CYCLE_EXTRACT_MODEL,
+            api_key=api_key or None,
+        )
+        agent = AgnoAgent(model=extract_model, instructions=[prompt], markdown=False)
+        result: list[str] = []
+        async with asyncio.timeout(30.0):
+            async for event in agent.arun(message, stream=True):
+                if hasattr(event, "content") and isinstance(event.content, str):
+                    result.append(event.content)
+        raw = "".join(result).strip()
+        match = re.search(r"\[.*?\]", raw, re.DOTALL)
+        if match:
+            parsed = json.loads(match.group())
+            if isinstance(parsed, list):
+                return [int(x) for x in parsed if isinstance(x, (int, float))]
+    except Exception as exc:
+        logger.warning("Cycle extraction failed, falling back to defaults: {}", exc)
+    return []
+
+
+def _build_detailed_cycle_section(cycles, repo, strategy_id: str) -> str:
+    """Build a rich context section for specific cycles with instructions and trades."""
+    if not cycles:
+        return ""
+    parts: list[str] = []
+    for c in cycles:
+        ts = (
+            c.compose_time.strftime("%Y-%m-%d %H:%M") if c.compose_time else "unknown"
+        )
+        rationale = (c.rationale or "").strip()
+        if len(rationale) > 1200:
+            rationale = rationale[:1197] + "..."
+
+        block = f"### Cycle #{c.cycle_index} ({ts})\n**Rationale:**\n{rationale}"
+
+        # Fetch instructions for this cycle
+        instructions = repo.get_instructions_by_compose(strategy_id, c.compose_id)
+        if instructions:
+            instr_lines = []
+            instruction_ids = []
+            for ins in instructions:
+                action = ins.action or "unknown"
+                side = ins.side or ""
+                qty = ins.quantity or ""
+                lev = f", leverage={ins.leverage}x" if ins.leverage else ""
+                note = f" — {ins.note}" if ins.note else ""
+                instr_lines.append(
+                    f"  - {ins.symbol}: {action} {side} qty={qty}{lev}{note}"
+                )
+                if ins.instruction_id:
+                    instruction_ids.append(ins.instruction_id)
+            block += "\n**Instructions:**\n" + "\n".join(instr_lines)
+
+            # Fetch execution details linked to these instructions
+            if instruction_ids:
+                details = repo.get_details_by_instruction_ids(
+                    strategy_id, instruction_ids
+                )
+                if details:
+                    det_lines = []
+                    for d in details:
+                        entry_ts = (
+                            d.entry_time.strftime("%Y-%m-%d %H:%M")
+                            if d.entry_time
+                            else "?"
+                        )
+                        exit_ts = (
+                            d.exit_time.strftime("%Y-%m-%d %H:%M")
+                            if d.exit_time
+                            else "open"
+                        )
+                        det_lines.append(
+                            f"  - {d.symbol} {d.type} {d.side}: "
+                            f"entry={d.entry_price} ({entry_ts}), "
+                            f"exit={d.exit_price} ({exit_ts}), "
+                            f"realized_pnl={d.realized_pnl}"
+                        )
+                    block += "\n**Execution Results:**\n" + "\n".join(det_lines)
+
+        parts.append(block)
+
+    header = f"## Requested Decision Cycles ({len(cycles)} cycle(s))\n"
+    return header + "\n\n".join(parts)
+
+
+def _build_context(strategy, req: StrategyChatRequest, repo, *, detailed_cycles=None) -> str:
     cfg: dict = strategy.config or {}
     meta: dict = strategy.strategy_metadata or {}
     tc: dict = cfg.get("trading_config") or {}
@@ -238,23 +355,34 @@ def _build_context(strategy, req: StrategyChatRequest, repo) -> str:
     else:
         sections.append("## Current Holdings\nNo open positions.")
 
-    cycles = repo.get_cycles(req.strategy_id, limit=req.recent_cycles)
-    if cycles:
-        lines = []
-        for c in reversed(cycles):
-            ts = (
-                c.compose_time.strftime("%Y-%m-%d %H:%M")
-                if c.compose_time
-                else "unknown"
-            )
-            rationale = (c.rationale or "").strip()
-            if len(rationale) > 600:
-                rationale = rationale[:597] + "..."
-            lines.append(f"  Cycle #{c.cycle_index} ({ts}):\n    {rationale}")
-        sections.append(
-            f"## Recent Decision Cycles (oldest → newest, last {len(cycles)})\n"
-            + "\n".join(lines)
+    if detailed_cycles:
+        # User asked for specific cycles — use rich format with instructions/trades
+        cycle_section = _build_detailed_cycle_section(
+            detailed_cycles, repo, req.strategy_id
         )
+        if cycle_section:
+            sections.append(cycle_section)
+    else:
+        # Default: recent cycles with truncated rationale
+        cycles = repo.get_cycles(req.strategy_id, limit=req.recent_cycles)
+        if cycles:
+            lines = []
+            for c in reversed(cycles):
+                ts = (
+                    c.compose_time.strftime("%Y-%m-%d %H:%M")
+                    if c.compose_time
+                    else "unknown"
+                )
+                rationale = (c.rationale or "").strip()
+                if len(rationale) > 600:
+                    rationale = rationale[:597] + "..."
+                lines.append(
+                    f"  Cycle #{c.cycle_index} ({ts}):\n    {rationale}"
+                )
+            sections.append(
+                f"## Recent Decision Cycles (oldest → newest, last {len(cycles)})\n"
+                + "\n".join(lines)
+            )
 
     details = repo.get_details(req.strategy_id, limit=req.recent_trades)
     if details:
@@ -332,23 +460,61 @@ def create_strategy_chat_router() -> APIRouter:
             tc.get("prompt_text") or tc.get("custom_prompt") or ""
         )
 
-        user_message = _build_context(strategy, req, repo)
-
         try:
             model = create_model_with_provider(
                 provider=provider,
                 model_id=model_id,
                 api_key=api_key or None,
             )
-            agent = AgnoAgent(
-                model=model,
-                instructions=[_CHAT_SYSTEM_PROMPT],
-                markdown=False,
-            )
         except Exception as exc:
             raise HTTPException(
                 status_code=500, detail=f"Failed to create model: {exc}"
             ) from exc
+
+        # ── Step 1: Ask AI which cycles the user wants ──────────────
+        detailed_cycles = None
+        max_cycle = repo.get_max_cycle_index(req.strategy_id)
+        if max_cycle and max_cycle > 0:
+            requested = await _extract_requested_cycles(
+                provider, api_key, req.message, max_cycle
+            )
+            if len(requested) > _MAX_CYCLE_FETCH:
+                async def _over_limit():
+                    yield _sse({
+                        "type": "error",
+                        "message": (
+                            f"You requested {len(requested)} cycles but the "
+                            f"maximum is {_MAX_CYCLE_FETCH}. Please narrow "
+                            "your selection."
+                        ),
+                    })
+                return StreamingResponse(
+                    _over_limit(),
+                    media_type="text/event-stream",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "X-Accel-Buffering": "no",
+                    },
+                )
+            if requested:
+                detailed_cycles = repo.get_cycles_by_indices(
+                    req.strategy_id, requested
+                )
+                logger.info(
+                    "Chat: user requested cycles {} → fetched {}",
+                    requested,
+                    [c.cycle_index for c in detailed_cycles],
+                )
+
+        # ── Step 2: Build context and main agent ────────────────────
+        user_message = _build_context(
+            strategy, req, repo, detailed_cycles=detailed_cycles
+        )
+        agent = AgnoAgent(
+            model=model,
+            instructions=[_CHAT_SYSTEM_PROMPT],
+            markdown=False,
+        )
 
         async def event_generator():
             # Send an immediate ping so the browser knows the connection is live

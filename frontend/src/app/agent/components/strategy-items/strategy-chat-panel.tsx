@@ -139,9 +139,11 @@ const StrategyChatPanel: FC<StrategyChatPanelProps> = ({ strategyId }) => {
 
   // ── Persistent message state (survives tab switches / strategy re-selects) ──
   const strategyKey = String(strategyId);
-  const storeMessages = useChatStore((s) => s.getMessages(strategyKey));
+  const storeMessages = useChatStore(
+    (s) => s.messagesByStrategy[strategyKey],
+  );
   const storeSetMessages = useChatStore((s) => s.setMessages);
-  const messages = storeMessages;
+  const messages = storeMessages ?? [];
   /** Stable setter that accepts either a value or a functional updater. */
   const setMessages = useCallback(
     (updaterOrValue: Message[] | ((prev: Message[]) => Message[])) => {
